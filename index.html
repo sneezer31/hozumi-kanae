@@ -414,12 +414,19 @@
                     var importedData = JSON.parse(e.target.result);
                     if (!Array.isArray(importedData)) throw new Error("無効な形式です");
                     
-                    if (confirm("現在のログを完全に破棄し、選択したファイルの内容で上書きしますか？")) {
-                        chatLogArray = importedData;
+                    if (confirm("現在のログを残したまま、選択したファイルの歴史を『追加（合体）』しますか？")) {
+                        // 【改修】上書きではなく、現在の配列の後ろに合体させる
+                        chatLogArray = chatLogArray.concat(importedData);
+                        
+                        // 時間順に並び替え（古い順）
+                        chatLogArray.sort(function(a, b) {
+                            return new Date(a.time) - new Date(b.time);
+                        });
+
                         enforceMemoryLimit();
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                         renderLogs();
-                        alert("歴史の搬入（上書き）が完了しました。");
+                        alert("歴史の合体が完了しました！");
                     }
                 } catch(err) {
                     alert("ファイルの読み込みに失敗しました。");
