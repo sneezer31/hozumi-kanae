@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-    <title>マザーファイル：第18号（PWA・自律母艦仕様）</title>
+    <title>マザーファイル：第18号（PWA・自律母艦仕様・分離ウィンドウ）</title>
     <!-- PWAマニフェストの読み込み -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
@@ -167,7 +167,7 @@
     </div>
 
     <script>
-        // Service Workerの登録（PWA化に必須）
+        // Service Workerの登録
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('sw.js').then(function(registration) {
@@ -178,7 +178,7 @@
             });
         }
 
-        // 仮想キーボード絶対防壁（全画面処理を除去）
+        // 仮想キーボード絶対防壁
         if (window.visualViewport) {
             function updateBodyHeight() {
                 document.body.style.height = window.visualViewport.height + "px";
@@ -194,6 +194,63 @@
             document.getElementById("main-input").addEventListener("focus", function() {
                 setTimeout(function() {
                     document.getElementById("control-area").scrollIntoView(false);
+                }, 400);
+            });
+            updateBodyHeight();
+        }
+
+        var STORAGE_KEY = "fleet_v18";
+        var API_KEY_VAULT = "gemini_api_key";
+        var SYSTEM_PROMPT_VAULT = "gemini_system_prompt";
+        var TOKEN_VAULT = "gemini_out_tokens";
+        var INPUT_TOKEN_VAULT = "gemini_in_tokens";
+        
+        var CHAR_LIMIT = 40000; // API送信時に切り出す推計トークン（文字数）の限界
+        
+        var chatLogArray = [];
+        var totalOutputTokens = 0;
+        var totalInputTokens = 0;
+
+        var logArea = document.getElementById("log-window");
+        var inputArea = document.getElementById("main-input");
+        var sendBtn = document.querySelector(".btn-send");
+        var consolePanel = document.getElementById("sidebar-console");
+
+        inputArea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+
+        function getFormattedTime() {
+            var now = new Date();
+            var yyyy = now.getFullYear();
+            var mm = ("0" + (now.getMonth() + 1)).slice(-2);
+            var dd = ("0" + now.getDate()).slice(-2);
+            var dayStr = ["日", "月", "火", "水", "木", "金", "土"][now.getDay()];
+            var hh = ("0" + now.getHours()).slice(-2);
+            var min = ("0" + now.getMinutes()).slice(-2);
+            return yyyy + "/" + mm + "/" + dd + "(" + dayStr + ") " + hh + ":" + min;
+        }
+
+        function updateRadar() {
+            var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
+            var waltzCount = Math.floor(chatLogArray.length / 2); 
+
+            document.getElementById("radar-waltz").innerText = waltzCount;
+            document.getElementById("radar-chars").innerText = totalChars.toLocaleString();
+            document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
+            document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
+        }
+
+        async function fetchGeminiAPI() {
+            var apiKey = localStorage.getItem(API_KEY_VAULT);
+            if (!apiKey) { alert("APIキーがありません。"); return null; }
+
+            // 【改修】送信ログの切り出し（スライディングウィンドウ分離作戦）
+            var sendLogs = [];
+            var currentTokens = 0;
+
+ llIntoView(false);
                 }, 400);
             });
             updateBodyHeight();
