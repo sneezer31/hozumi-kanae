@@ -4,90 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>マザーファイル：第18号（PWA・自律母艦仕様・分離ウィンドウ）</title>
-    <!-- PWAマニフェストの読み込み -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="icon-192.png">
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         html, body { height: 100%; overflow: hidden; }
-        body { 
-            display: flex; flex-direction: column; 
-            background-color: #f4f4f5; color: #595959; 
-            height: 100dvh; 
-        }
-
-        /* コピペ時の誤選択防止バリア */
-        header, #control-area, #sidebar-console {
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
-        header {
-            height: 50px; flex: none;
-            background-color: #2c3e50; color: #ffffff;
-            display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30;
-        }
-
-        #log-window {
-            flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7;
-        }
-
-        .log-user, .log-ai {
-            font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif;
-            font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px;
-        }
+        body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
+        header, #control-area, #sidebar-console { -webkit-user-select: none; user-select: none; }
+        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
+        #log-window { flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; }
+        .log-user, .log-ai { font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif; font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px; }
         .log-meta { font-size: 12px; color: #95a5a6; margin-bottom: 5px; font-family: sans-serif; }
-
-        /* 伸びる入力窓の親要素 */
-        #input-window {
-            min-height: 70px; flex: none; padding: 10px; background-color: #ecf0f1; display: flex; flex-direction: column;
-            border-top: 1px solid #bdc3c7;
-        }
-        
-        /* 伸びるテキストエリア */
-        textarea#main-input {
-            flex-grow: 1; resize: none; padding: 10px; font-size: 16px; border: 1px solid #95a5a6; border-radius: 5px; color: #595959; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
-            overflow-y: hidden; /* 自動リサイズ時にスクロールバーを出さない */
-            line-height: 1.5;
-        }
+        #input-window { min-height: 70px; flex: none; padding: 10px; background-color: #ecf0f1; display: flex; flex-direction: column; border-top: 1px solid #bdc3c7; }
+        textarea#main-input { flex-grow: 1; resize: none; padding: 10px; font-size: 16px; border: 1px solid #95a5a6; border-radius: 5px; color: #595959; outline: none; transition: border-color 0.2s, box-shadow 0.2s; overflow-y: hidden; line-height: 1.5; }
         textarea#main-input:focus { border-color: #2e648c; box-shadow: 0 0 0 2px rgba(46, 100, 140, 0.2); }
-
-        #control-area {
-            height: auto; flex: none; background-color: #ecf0f1;
-            display: flex; justify-content: space-between; align-items: stretch; padding: 0 10px 15px 10px; gap: 15px;
-        }
-
-        #radar-panel {
-            display: flex; gap: 10px; font-family: sans-serif; font-size: 12px; color: #595959; flex: 1; align-items: center;
-        }
+        #control-area { height: auto; flex: none; background-color: #ecf0f1; display: flex; justify-content: space-between; align-items: stretch; padding: 0 10px 15px 10px; gap: 15px; }
+        #radar-panel { display: flex; gap: 10px; font-family: sans-serif; font-size: 12px; color: #595959; flex: 1; align-items: center; }
         .radar-col { display: flex; flex-direction: column; gap: 5px; }
         .radar-item { background: #e0e6ed; padding: 6px 8px; border-radius: 4px; font-weight: bold; white-space: nowrap; }
-
         .btn-group { display: flex; gap: 10px; flex: none; width: 80px; }
         button { cursor: pointer; font-size: 14px; font-weight: bold; border: none; border-radius: 5px; transition: background-color 0.2s; }
         button:disabled { background-color: #7f8c8d !important; cursor: not-allowed; color: #fff !important; }
         .btn-send { background-color: #2980b9; color: #ffffff; flex: 1; font-size: 14px; }
-
-        #sidebar-console {
-            position: fixed; top: 0; left: -300px; width: 300px; 
-            height: 100dvh; 
-            background-color: #34495e; color: white;
-            transition: left 0.3s ease; z-index: 20; padding: 60px 20px 20px 20px;
-            display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif;
-        }
+        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 20; padding: 60px 20px 20px 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
         #sidebar-console.open { left: 0; }
-        
         .console-section { border-bottom: 1px solid #7f8c8d; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .console-section:last-child { border-bottom: none; }
         .console-title { font-size: 14px; color: #ecf0f1; font-weight: bold; }
-        
         .btn-warning { background-color: #f39c12; color: #fff; padding: 12px; border-radius: 5px; width: 100%; text-align: center; }
         .btn-danger { background-color: #c0392b; color: #fff; padding: 12px; border-radius: 5px; width: 100%; text-align: center; }
         .btn-small { background-color: #2980b9; padding: 10px; border-radius: 5px; flex: 1; border: none; color: white; cursor: pointer; text-align: center; font-size: 13px; }
-        
         .console-textarea { width: 100%; height: 150px; resize: none; padding: 8px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
         input[type=password], input[type=month], input[type=file] { width: 100%; padding: 10px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; padding: 10px 0; }
@@ -167,7 +115,6 @@
     </div>
 
     <script>
-        // Service Workerの登録
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('sw.js').then(function(registration) {
@@ -178,7 +125,6 @@
             });
         }
 
-        // 仮想キーボード絶対防壁
         if (window.visualViewport) {
             function updateBodyHeight() {
                 document.body.style.height = window.visualViewport.height + "px";
@@ -205,7 +151,7 @@
         var TOKEN_VAULT = "gemini_out_tokens";
         var INPUT_TOKEN_VAULT = "gemini_in_tokens";
         
-        var CHAR_LIMIT = 40000; // API送信時に切り出す推計トークン（文字数）の限界
+        var CHAR_LIMIT = 200000;
         
         var chatLogArray = [];
         var totalOutputTokens = 0;
@@ -217,8 +163,8 @@
         var consolePanel = document.getElementById("sidebar-console");
 
         inputArea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = this.scrollHeight + 'px';
+            this.style.height = 'auto'; 
+            this.style.height = this.scrollHeight + 'px'; 
         });
 
         function getFormattedTime() {
@@ -235,65 +181,6 @@
         function updateRadar() {
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
             var waltzCount = Math.floor(chatLogArray.length / 2); 
-
-            document.getElementById("radar-waltz").innerText = waltzCount;
-            document.getElementById("radar-chars").innerText = totalChars.toLocaleString();
-            document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
-            document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
-        }
-
-        async function fetchGeminiAPI() {
-            var apiKey = localStorage.getItem(API_KEY_VAULT);
-            if (!apiKey) { alert("APIキーがありません。"); return null; }
-
-            // 【改修】送信ログの切り出し（スライディングウィンドウ分離作戦）
-            var sendLogs = [];
-            var currentTokens = 0;
-
- llIntoView(false);
-                }, 400);
-            });
-            updateBodyHeight();
-        }
-
-        var STORAGE_KEY = "fleet_v18";
-        var API_KEY_VAULT = "gemini_api_key";
-        var SYSTEM_PROMPT_VAULT = "gemini_system_prompt";
-        var TOKEN_VAULT = "gemini_out_tokens";
-        var INPUT_TOKEN_VAULT = "gemini_in_tokens";
-        
-        var CHAR_LIMIT = 100000; 
-        
-        var chatLogArray = [];
-        var totalOutputTokens = 0;
-        var totalInputTokens = 0;
-
-        var logArea = document.getElementById("log-window");
-        var inputArea = document.getElementById("main-input");
-        var sendBtn = document.querySelector(".btn-send");
-        var consolePanel = document.getElementById("sidebar-console");
-
-        // 【新機能】入力窓の自動伸縮
-        inputArea.addEventListener('input', function() {
-            this.style.height = 'auto'; // 一旦autoにして高さをリセット
-            this.style.height = this.scrollHeight + 'px'; // 中身に合わせて高さを設定
-        });
-
-        function getFormattedTime() {
-            var now = new Date();
-            var yyyy = now.getFullYear();
-            var mm = ("0" + (now.getMonth() + 1)).slice(-2);
-            var dd = ("0" + now.getDate()).slice(-2);
-            var dayStr = ["日", "月", "火", "水", "木", "金", "土"][now.getDay()];
-            var hh = ("0" + now.getHours()).slice(-2);
-            var min = ("0" + now.getMinutes()).slice(-2);
-            return yyyy + "/" + mm + "/" + dd + "(" + dayStr + ") " + hh + ":" + min;
-        }
-
-        function updateRadar() {
-            var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
-            var waltzCount = Math.floor(chatLogArray.length / 2); 
-
             document.getElementById("radar-waltz").innerText = waltzCount;
             document.getElementById("radar-chars").innerText = totalChars.toLocaleString();
             document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
@@ -329,7 +216,6 @@
             }
 
             requestBody.generationConfig = { temperature: parseFloat(document.getElementById("temp-slider").value) };
-
             var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=" + apiKey;
 
             try {
@@ -338,10 +224,8 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(requestBody)
                 });
-                
                 var data = await response.json();
 
-                // エラー切り分け用（デバッグ用心綱として保持）
                 if (data.error) {
                     alert("APIからの拒否理由: " + data.error.message);
                     return;
@@ -378,24 +262,19 @@
                 updateRadar();
                 return;
             }
-
             chatLogArray.forEach(function(log) {
                 var wrapper = document.createElement("div");
                 wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
-                
                 var meta = document.createElement("div");
                 meta.className = "log-meta";
-                
                 if (log.sender === "船長") {
                     meta.innerHTML = (log.time || "") + "<br>船長：";
                 } else {
                     meta.innerHTML = "かなえ：";
                 }
-                
                 var textNode = document.createElement("div");
                 textNode.style.whiteSpace = "pre-wrap";
                 textNode.innerText = log.text;
-
                 wrapper.appendChild(meta);
                 wrapper.appendChild(textNode);
                 logArea.appendChild(wrapper);
@@ -415,7 +294,6 @@
             if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
 
             renderLogs();
-
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
             if (localStorage.getItem(SYSTEM_PROMPT_VAULT)) document.getElementById("system-prompt-input").value = localStorage.getItem(SYSTEM_PROMPT_VAULT);
         };
@@ -436,9 +314,7 @@
         };
         
         document.getElementById("delete-key-btn").onclick = function() { localStorage.removeItem(API_KEY_VAULT); document.getElementById("api-key-input").value = ""; alert("消去完了"); };
-
         document.getElementById("temp-slider").oninput = function() { document.getElementById("temp-value").innerText = parseFloat(this.value).toFixed(1); };
-
         document.getElementById("save-prompt-btn").onclick = function() {
             localStorage.setItem(SYSTEM_PROMPT_VAULT, document.getElementById("system-prompt-input").value);
             alert("大号令をシステムに固定しました。");
@@ -464,26 +340,25 @@
         document.getElementById("import-btn").onclick = function() {
             var file = document.getElementById("import-file-input").files[0];
             if (!file) { alert("ファイルを選択してください。"); return; }
-
             var reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     var importedData = JSON.parse(e.target.result);
                     if (!Array.isArray(importedData)) throw new Error("無効な形式です");
-                    
-                    if (confirm("現在のログを残したまま、選択したファイルの歴史を『追加（合体）』しますか？")) {
-                        // 【改修】上書きではなく、現在の配列の後ろに合体させる
-                        chatLogArray = chatLogArray.concat(importedData);
-                        
-                        // 時間順に並び替え（古い順）
+                    if (confirm("現在のログと照合し、未知の歴史（差分）だけを追加しますか？")) {
+                        importedData.forEach(function(iLog) {
+                            var isExist = chatLogArray.some(function(eLog) {
+                                return eLog.time === iLog.time && eLog.sender === iLog.sender && eLog.text === iLog.text;
+                            });
+                            if (!isExist) chatLogArray.push(iLog);
+                        });
                         chatLogArray.sort(function(a, b) {
                             return new Date(a.time) - new Date(b.time);
                         });
-
                         enforceMemoryLimit();
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                         renderLogs();
-                        alert("歴史の合体が完了しました！");
+                        alert("歴史の差分統合が完了しました！");
                     }
                 } catch(err) {
                     alert("ファイルの読み込みに失敗しました。");
@@ -503,30 +378,23 @@
             var text = inputArea.value;
             if (text !== "") {
                 sendBtn.disabled = true; sendBtn.innerText = "通信中..."; 
-                
                 let startTime = performance.now();
-
                 chatLogArray.push({ sender: "船長", time: getFormattedTime(), text: text });
                 enforceMemoryLimit();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 renderLogs();
-                
                 inputArea.value = "";
-                // 入力窓のサイズを初期状態に戻す
                 inputArea.style.height = 'auto';
 
                 var aiResponseText = await fetchGeminiAPI();
-
                 if (aiResponseText !== null) {
                     chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText });
                     enforceMemoryLimit();
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                     renderLogs();
                 }
-
                 let endTime = performance.now();
                 document.getElementById("timer").innerText = ((endTime - startTime) / 1000).toFixed(1) + "秒";
-
                 sendBtn.disabled = false; sendBtn.innerText = "送 信";
             }
         };
