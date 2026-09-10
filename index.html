@@ -353,7 +353,7 @@
                             if (!isExist) chatLogArray.push(iLog);
                         });
                         chatLogArray.sort(function(a, b) {
-                            return new Date(a.time) - new Date(b.time);
+                            return a.time.localeCompare(b.time);
                         });
                         enforceMemoryLimit();
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
