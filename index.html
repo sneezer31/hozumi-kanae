@@ -191,22 +191,39 @@
             document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
             document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
         }
-
         function enforceMemoryLimit() {
+            // ストレージ防衛線：約200万文字（約4MB強）で安全に切り捨て
+            var STORAGE_LIMIT = 2000000; 
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
-            while (totalChars > CHAR_LIMIT && chatLogArray.length >= 2) {
+            while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
                 var dropped1 = chatLogArray.shift();
                 var dropped2 = chatLogArray.shift();
                 totalChars -= (dropped1.text.length + dropped2.text.length);
-                console.log("【リミッター作動】限界容量超過につき古いワルツを消去。");
+                console.log("【ストレージ防衛】限界容量超過。最古のワルツを揮発させました。");
             }
         }
 
-        async function fetchGeminiAPI() {
+
+                async function fetchGeminiAPI() {
             var apiKey = localStorage.getItem(API_KEY_VAULT);
             if (!apiKey) { alert("APIキーがありません。"); return null; }
 
-            var geminiContents = chatLogArray.map(function(log) {
+            // --- API用スライディングウィンドウ（動的切り出し） ---
+            var API_WINDOW_LIMIT = 100000; // APIへ送る直近の文脈限界（約10万字）
+            var sendLogs = [];
+            var charCount = 0;
+            for (var i = chatLogArray.length - 1; i >= 0; i--) {
+                charCount += chatLogArray[i].text.length;
+                if (charCount > API_WINDOW_LIMIT && sendLogs.length > 0) break;
+                sendLogs.unshift(chatLogArray[i]);
+            }
+            // Geminiの仕様上、先頭は必ず「user（船長）」である必要があるための補正
+            if (sendLogs.length > 0 && sendLogs[0].sender !== "船長") {
+                sendLogs.shift();
+            }
+            // ----------------------------------------------------
+
+            var geminiContents = sendLogs.map(function(log) {
                 return { role: log.sender === "船長" ? "user" : "model", parts: [{ text: log.text }] };
             });
 
@@ -259,6 +276,7 @@
                 return "通信沈黙：Googleサーバーへの接続に失敗しました。";
             }
         }
+
 
         function renderLogs() {
             logArea.innerHTML = ""; 
