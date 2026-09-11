@@ -223,9 +223,11 @@
             }
             // ----------------------------------------------------
 
-            var geminiContents = sendLogs.map(function(log) {
-                return { role: log.sender === "船長" ? "user" : "model", parts: [{ text: log.text }] };
+                        var geminiContents = sendLogs.map(function(log) {
+                var timeStr = log.time ? "【" + log.time + "】\n" : "";
+                return { role: log.sender === "船長" ? "user" : "model", parts: [{ text: timeStr + log.text }] };
             });
+
 
             var requestBody = {
                 contents: geminiContents,
