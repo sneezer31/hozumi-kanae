@@ -223,7 +223,7 @@
             }
             // ----------------------------------------------------
 
-                        var geminiContents = sendLogs.map(function(log) {
+                                    var geminiContents = sendLogs.map(function(log) {
                 var timeStr = log.time ? "【" + log.time + "】\n" : "";
                 return { role: log.sender === "船長" ? "user" : "model", parts: [{ text: timeStr + log.text }] };
             });
