@@ -13,7 +13,7 @@
         html, body { height: 100%; overflow: hidden; }
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
         header, #control-area, #sidebar-console { -webkit-user-select: none; user-select: none; }
-        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
+        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: flex-end; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
         #log-window { flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; }
         .log-user, .log-ai { font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif; font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px; }
         .log-meta { font-size: 12px; color: #95a5a6; margin-bottom: 5px; font-family: sans-serif; display: flex; align-items: center; gap: 5px; }
@@ -29,8 +29,12 @@
         button { cursor: pointer; font-size: 14px; font-weight: bold; border: none; border-radius: 5px; transition: background-color 0.2s; }
         button:disabled { background-color: #7f8c8d !important; cursor: not-allowed; color: #fff !important; }
         .btn-send { background-color: #2980b9; color: #ffffff; flex: 1; font-size: 14px; }
-        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 20; padding: 60px 20px 20px 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
+        
+        #sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 35; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; }
+        #sidebar-overlay.open { opacity: 1; visibility: visible; }
+        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
         #sidebar-console.open { left: 0; }
+        
         .console-section { border-bottom: 1px solid #7f8c8d; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .console-section:last-child { border-bottom: none; }
         .console-title { font-size: 14px; color: #ecf0f1; font-weight: bold; }
@@ -46,6 +50,7 @@
 </head>
 <body>
 
+    <div id="sidebar-overlay"></div>
     <div id="sidebar-console">
         <div class="console-section">
             <div class="console-title">API認証</div>
@@ -80,12 +85,13 @@
         <div class="console-section">
             <div class="console-title">ログ管理</div>
             <button class="btn-warning" id="undo-btn">一手やり直し (Undo)</button>
-            <button class="btn-danger" id="reset-btn">全ログ強制消去</button>
+            <button class="btn-small" id="copy-checked-btn" style="background: #2c3e50; border: 1px solid #7f8c8d;">チェック項目をコピー</button>
+            <button class="btn-small" id="delete-checked-btn" style="background: #c0392b;">チェック項目を削除</button>
+            <button class="btn-danger" id="reset-btn" style="margin-top: 15px;">全ログ強制消去</button>
         </div>
     </div>
 
     <header>
-        <button id="toggle-console-btn" style="background:none; border:none; color:white; padding:0; cursor: pointer; font-size: 16px;">≡ コンソール</button>
         <div id="secretary-name">穂積かなえ主席書記官</div>
     </header>
 
@@ -97,7 +103,9 @@
 
     <div id="control-area">
         <div id="radar-panel">
-            <div class="radar-col">
+            <button id="toggle-console-btn" style="background: #34495e; color: white; border: none; border-radius: 4px; padding: 0 12px; height: 100%; font-size: 18px; font-weight: bold; cursor: pointer; flex: none;">≡</button>
+            
+            <div class="radar-col" style="margin-left: 5px;">
                 <div class="radar-item">ワルツ: <span id="radar-waltz">0</span></div>
                 <div class="radar-item">文字数: <span id="radar-chars">0</span></div>
             </div>
@@ -105,13 +113,11 @@
                 <div class="radar-item">入力: <span id="radar-input-tokens">0</span></div>
                 <div class="radar-item">出力: <span id="radar-output-tokens">0</span></div>
             </div>
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin-left:10px;">
-                <button id="copy-checked-btn" style="font-size:10px; padding:3px 12px; border:1px solid #bdc3c7; border-radius:3px; background:#fff; color:#595959;">ｺﾋﾟｰ</button>
-                <button id="delete-checked-btn" style="font-size:10px; padding:3px 12px; border:1px solid #e74c3c; border-radius:3px; background:#fff; color:#e74c3c;">削除</button>
-            </div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:5px; margin-left:auto;">
+            
+            <button id="reset-meter-btn" style="font-size:10px; padding:3px 8px; border:1px solid #bdc3c7; border-radius:3px; background:#fff; color:#595959; height: fit-content; align-self: center;">ﾘｾｯﾄ</button>
+            
+            <div style="display:flex; align-items:center; margin-left:auto;">
                 <b id="timer" style="color:#2980b9; font-size:14px; white-space:nowrap;">0.0秒</b>
-                <button id="reset-meter-btn" style="font-size:10px; padding:3px 8px; border:1px solid #bdc3c7; border-radius:3px; background:#fff; color:#595959;">ﾘｾｯﾄ</button>
             </div>
         </div>
         <div class="btn-group">
@@ -155,21 +161,73 @@
         var SYSTEM_PROMPT_VAULT = "gemini_system_prompt";
         var TOKEN_VAULT = "gemini_out_tokens";
         var INPUT_TOKEN_VAULT = "gemini_in_tokens";
+        var WALTZ_COUNT_VAULT = "gemini_waltz_count";
         
         var CHAR_LIMIT = 200000;
         
         var chatLogArray = [];
         var totalOutputTokens = 0;
         var totalInputTokens = 0;
+        var sessionWaltzCount = 0;
 
         var logArea = document.getElementById("log-window");
         var inputArea = document.getElementById("main-input");
         var sendBtn = document.querySelector(".btn-send");
         var consolePanel = document.getElementById("sidebar-console");
+        var overlay = document.getElementById("sidebar-overlay");
+
+        function openSidebar() {
+            consolePanel.classList.add("open");
+            overlay.classList.add("open");
+        }
+        function closeSidebar() {
+            consolePanel.classList.remove("open");
+            overlay.classList.remove("open");
+        }
+
+        document.getElementById("toggle-console-btn").onclick = openSidebar;
+        overlay.onclick = closeSidebar;
+
+        // タッチスワイプ操作の実装
+        var touchStartX = 0;
+        var touchStartY = 0;
+        var touchEndX = 0;
+        var touchEndY = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, {passive: true});
+
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            handleSwipe();
+        }, {passive: true});
+
+        function handleSwipe() {
+            var xDiff = touchStartX - touchEndX;
+            var yDiff = Math.abs(touchStartY - touchEndY);
+            if (yDiff > Math.abs(xDiff)) return; // 縦スクロール時は無視
+
+            if (xDiff > 50 && consolePanel.classList.contains("open")) {
+                closeSidebar(); // 左スワイプで閉じる
+            } else if (xDiff < -50 && touchStartX < 30 && !consolePanel.classList.contains("open")) {
+                openSidebar(); // 画面左端からの右スワイプで開く
+            }
+        }
 
         inputArea.addEventListener('input', function() {
             this.style.height = 'auto'; 
             this.style.height = this.scrollHeight + 'px'; 
+        });
+
+        // Ctrl+Enter / Cmd+Enter での送信ショートカット
+        inputArea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (!sendBtn.disabled) sendBtn.click();
+            }
         });
 
         function getFormattedTime() {
@@ -185,8 +243,7 @@
 
         function updateRadar() {
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
-            var waltzCount = Math.floor(chatLogArray.length / 2); 
-            document.getElementById("radar-waltz").innerText = waltzCount;
+            document.getElementById("radar-waltz").innerText = sessionWaltzCount;
             document.getElementById("radar-chars").innerText = totalChars.toLocaleString();
             document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
             document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
@@ -207,7 +264,6 @@
             var apiKey = localStorage.getItem(API_KEY_VAULT);
             if (!apiKey) { alert("APIキーがありません。"); return null; }
 
-            // --- API用スライディングウィンドウ（動的切り出し） ---
             var API_WINDOW_LIMIT = 100000;
             var sendLogs = [];
             var charCount = 0;
@@ -217,13 +273,11 @@
                 sendLogs.unshift(chatLogArray[i]);
             }
 
-            // 先頭がAIの場合は除去して必ず「船長(user)」から開始
             while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") {
                 sendLogs.shift();
             }
             if (sendLogs.length === 0) return null;
 
-            // ロール連続の解消（同一送信者が連続している場合はテキストを結合し1ターンに正規化）
             var geminiContents = [];
             sendLogs.forEach(function(log) {
                 var role = log.sender === "船長" ? "user" : "model";
@@ -234,24 +288,16 @@
                 if (lastContent && lastContent.role === role) {
                     lastContent.parts[0].text += "\n\n" + currentText;
                 } else {
-                    geminiContents.push({
-                        role: role,
-                        parts: [{ text: currentText }]
-                    });
+                    geminiContents.push({ role: role, parts: [{ text: currentText }] });
                 }
             });
 
-            // 末尾がmodelで終わる場合はAPIが拒否するため除去（必ずuserで終わるように調整）
             if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role !== "user") {
                 geminiContents.pop();
             }
             if (geminiContents.length === 0) return null;
-            // ----------------------------------------------------
 
-            var requestBody = {
-                contents: geminiContents,
-                tools: [{ googleSearch: {} }]
-            };
+            var requestBody = { contents: geminiContents, tools: [{ googleSearch: {} }] };
 
             var savedPrompt = localStorage.getItem(SYSTEM_PROMPT_VAULT);
             if (savedPrompt && savedPrompt.trim() !== "") {
@@ -347,18 +393,22 @@
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT);
             if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
 
+            var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT);
+            if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
+
             renderLogs();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
             if (localStorage.getItem(SYSTEM_PROMPT_VAULT)) document.getElementById("system-prompt-input").value = localStorage.getItem(SYSTEM_PROMPT_VAULT);
         };
 
-        document.getElementById("toggle-console-btn").onclick = function() { consolePanel.classList.toggle("open"); };
-
         document.getElementById("copy-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked"));
             if(!checked.length) return;
             var txt = checked.map(cb => chatLogArray[cb.value].text).join("\n\n---\n");
-            navigator.clipboard.writeText(txt).then(() => alert(checked.length + "件の歴史をコピーしました。"));
+            navigator.clipboard.writeText(txt).then(() => {
+                alert(checked.length + "件の歴史をコピーしました。");
+                closeSidebar();
+            });
         };
 
         document.getElementById("delete-checked-btn").onclick = function() {
@@ -370,13 +420,15 @@
                 enforceMemoryLimit();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 renderLogs();
+                closeSidebar();
             }
         };
 
         document.getElementById("reset-meter-btn").onclick = function() {
-            if (confirm("トークンメーターをゼロにリセットしますか？（対話記憶は保持されます）")) {
+            if (confirm("トークンとワルツのメーターをゼロにリセットしますか？（歴史は保持されます）")) {
                 totalOutputTokens = 0; localStorage.setItem(TOKEN_VAULT, 0);
                 totalInputTokens = 0; localStorage.setItem(INPUT_TOKEN_VAULT, 0);
+                sessionWaltzCount = 0; localStorage.setItem(WALTZ_COUNT_VAULT, 0);
                 updateRadar();
             }
         };
@@ -441,10 +493,33 @@
         };
 
         document.getElementById("undo-btn").onclick = function() {
-            if (chatLogArray.length > 0) { chatLogArray.pop(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); }
+            if (chatLogArray.length >= 2) { 
+                chatLogArray.pop(); 
+                chatLogArray.pop(); 
+                sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); 
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
+                localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
+                renderLogs(); 
+                closeSidebar();
+            } else if (chatLogArray.length === 1) {
+                chatLogArray.pop();
+                sessionWaltzCount = 0;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
+                localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
+                renderLogs();
+                closeSidebar();
+            }
         };
+
         document.getElementById("reset-btn").onclick = function() {
-            if (confirm("金庫を完全に空にしますか？")) { chatLogArray = []; localStorage.removeItem(STORAGE_KEY); renderLogs(); }
+            if (confirm("金庫を完全に空にしますか？")) { 
+                chatLogArray = []; 
+                sessionWaltzCount = 0;
+                localStorage.removeItem(STORAGE_KEY); 
+                localStorage.setItem(WALTZ_COUNT_VAULT, 0);
+                renderLogs(); 
+                closeSidebar();
+            }
         };
 
         sendBtn.onclick = async function() {
@@ -463,6 +538,10 @@
                 if (aiResponseText !== null) {
                     chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText });
                     enforceMemoryLimit();
+                    
+                    sessionWaltzCount++;
+                    localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
+                    
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                     renderLogs();
                 }
