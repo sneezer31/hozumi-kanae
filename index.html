@@ -116,7 +116,7 @@
                 <div class="radar-item">出力: <span id="radar-output-tokens">0</span></div>
             </div>
             
-            <button id="reset-meter-btn" style="font-size:10px; padding:0 8px; border:1px solid #bdc3c7; border-radius:3px; background:#fff; color:#595959; align-self: stretch; display: flex; align-items: center; justify-content: center;">ﾘｾｯﾄ</button>
+            <button id="reset-meter-btn" style="font-size:10px; padding:0 8px; border:none; border-radius:4px; background:#e0e6ed; color:#595959; align-self: stretch; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold;">ﾘｾｯﾄ</button>
             
             <div style="display:flex; align-items:center; margin-left:auto;">
                 <div id="timer-container">
@@ -130,13 +130,13 @@
     </div>
 
     <script>
+        // ServiceWorkerの抹消処理（古いキャッシュの亡霊を浄化）
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('sw.js').then(function(registration) {
-                    console.log('ServiceWorker 登録成功: ', registration.scope);
-                }, function(err) {
-                    console.log('ServiceWorker 登録失敗: ', err);
-                });
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (let registration of registrations) {
+                    registration.unregister();
+                    console.log('ServiceWorker 抹消完了');
+                }
             });
         }
 
@@ -266,9 +266,8 @@
         function renderTimers(activeStr = "") {
             var container = document.getElementById("timer-container");
             var html = "";
-            timeHistory.forEach(function(t, i) {
-                var opacityVal = 1 - ((timeHistory.length - 1 - i) * 0.3);
-                html += `<span style="opacity:${opacityVal}; color:#333333;">${t}</span>`;
+            timeHistory.forEach(function(t) {
+                html += `<span style="color:#333333;">${t}</span>`;
             });
             if (activeStr) {
                 html += `<span style="color:#333333;">${activeStr}</span>`;
