@@ -231,7 +231,6 @@
     <script>
         // ----------------------------------------------------
         // [初期設定] PWAサービスワーカーの無効化（キャッシュ除去）
-        // 古いバージョンが残り続けるのを防ぐため、登録を解除します。
         // ----------------------------------------------------
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -303,13 +302,11 @@
         var clickTimer = null;
         document.getElementById("toggle-console-btn").addEventListener('click', function(e) {
             if (clickTimer == null) {
-                // 1回目のクリック：0.3秒待機して2回目が来なければ左サイドバーを開く
                 clickTimer = setTimeout(function() {
                     clickTimer = null;
                     if (!rightPanel.classList.contains("open")) openSidebar(); 
                 }, 300); 
             } else {
-                // 2回目のクリック：0.3秒以内に押されたらタイマーをキャンセルし、右サイドバーを開く
                 clearTimeout(clickTimer);
                 clickTimer = null;
                 if (!consolePanel.classList.contains("open")) openRightSidebar(); 
@@ -511,6 +508,10 @@
             if (savedInfo.trim() !== "") {
                 finalInstruction += "\n\n[Saved Information]\n" + savedInfo;
             }
+
+            // ★追加：検索ツールの暴走を防ぐための強制プロトコル（APIリクエスト時に毎度注入）
+            finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
+
             if (finalInstruction.trim() !== "") {
                 requestBody.systemInstruction = { parts: [{ text: finalInstruction }] };
             }
@@ -532,6 +533,12 @@
                     alert("APIからの拒否理由: " + data.error.message);
                     return null;
                 }
+
+                // ★追加：MALFORMED_FUNCTION_CALLのフェイルセーフ処理（自爆回避）
+                if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") {
+                    return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？";
+                }
+
                 if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) {
                     alert("異常データ受信: " + JSON.stringify(data).substring(0, 300));
                     return null;
