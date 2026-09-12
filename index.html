@@ -191,8 +191,8 @@
             document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
             document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
         }
+
         function enforceMemoryLimit() {
-            // ストレージ防衛線：約200万文字（約4MB強）で安全に切り捨て
             var STORAGE_LIMIT = 2000000; 
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
             while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
@@ -203,13 +203,12 @@
             }
         }
 
-
-                async function fetchGeminiAPI() {
+        async function fetchGeminiAPI() {
             var apiKey = localStorage.getItem(API_KEY_VAULT);
             if (!apiKey) { alert("APIキーがありません。"); return null; }
 
             // --- API用スライディングウィンドウ（動的切り出し） ---
-            var API_WINDOW_LIMIT = 100000; // APIへ送る直近の文脈限界（約10万字）
+            var API_WINDOW_LIMIT = 100000;
             var sendLogs = [];
             var charCount = 0;
             for (var i = chatLogArray.length - 1; i >= 0; i--) {
@@ -217,17 +216,37 @@
                 if (charCount > API_WINDOW_LIMIT && sendLogs.length > 0) break;
                 sendLogs.unshift(chatLogArray[i]);
             }
-            // Geminiの仕様上、先頭は必ず「user（船長）」である必要があるための補正
-            if (sendLogs.length > 0 && sendLogs[0].sender !== "船長") {
+
+            // 先頭がAIの場合は除去して必ず「船長(user)」から開始
+            while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") {
                 sendLogs.shift();
             }
-            // ----------------------------------------------------
+            if (sendLogs.length === 0) return null;
 
-                                    var geminiContents = sendLogs.map(function(log) {
+            // ロール連続の解消（同一送信者が連続している場合はテキストを結合し1ターンに正規化）
+            var geminiContents = [];
+            sendLogs.forEach(function(log) {
+                var role = log.sender === "船長" ? "user" : "model";
                 var timeStr = log.time ? "【" + log.time + "】\n" : "";
-                return { role: log.sender === "船長" ? "user" : "model", parts: [{ text: timeStr + log.text }] };
+                var currentText = timeStr + log.text;
+
+                var lastContent = geminiContents[geminiContents.length - 1];
+                if (lastContent && lastContent.role === role) {
+                    lastContent.parts[0].text += "\n\n" + currentText;
+                } else {
+                    geminiContents.push({
+                        role: role,
+                        parts: [{ text: currentText }]
+                    });
+                }
             });
 
+            // 末尾がmodelで終わる場合はAPIが拒否するため除去（必ずuserで終わるように調整）
+            if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role !== "user") {
+                geminiContents.pop();
+            }
+            if (geminiContents.length === 0) return null;
+            // ----------------------------------------------------
 
             var requestBody = {
                 contents: geminiContents,
@@ -252,11 +271,11 @@
 
                 if (data.error) {
                     alert("APIからの拒否理由: " + data.error.message);
-                    return;
+                    return null;
                 }
                 if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) {
                     alert("異常データ受信: " + JSON.stringify(data).substring(0, 300));
-                    return;
+                    return null;
                 }            
 
                 if (data.candidates && data.candidates[0].content.parts[0].text) {
@@ -278,7 +297,6 @@
                 return "通信沈黙：Googleサーバーへの接続に失敗しました。";
             }
         }
-
 
         function renderLogs() {
             logArea.innerHTML = ""; 
@@ -345,9 +363,10 @@
 
         document.getElementById("delete-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked"));
-            if(!checked.length) return;
-            if(confirm(checked.length + "件の歴史を削除しますか？")) {
-                checked.map(cb => parseInt(cb.value)).sort((a,b) => b - a).forEach(idx => chatLogArray.splice(idx, 1));
+            if (!checked.length) return;
+            if (confirm(checked.length + "件の歴史を削除しますか？")) {
+                var targetIndices = new Set(checked.map(cb => parseInt(cb.value, 10)));
+                chatLogArray = chatLogArray.filter((_, idx) => !targetIndices.has(idx));
                 enforceMemoryLimit();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 renderLogs();
