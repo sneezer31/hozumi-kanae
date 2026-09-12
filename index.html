@@ -12,7 +12,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; overflow: hidden; }
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
-        header, #control-area, #sidebar-console { -webkit-user-select: none; user-select: none; }
+        header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
         header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: flex-end; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
         #log-window { flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; }
         .log-user, .log-ai { font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif; font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px; }
@@ -26,22 +26,34 @@
         .radar-col { display: flex; flex-direction: column; gap: 5px; }
         .radar-item { background: #e0e6ed; padding: 6px 8px; border-radius: 4px; font-weight: bold; white-space: nowrap; }
         .btn-group { display: flex; gap: 10px; flex: none; width: 80px; }
-        button { cursor: pointer; font-size: 14px; font-weight: bold; border: none; border-radius: 5px; transition: background-color 0.2s; }
+        button { cursor: pointer; font-size: 14px; font-weight: bold; border: none; border-radius: 5px; transition: background-color 0.2s, color 0.2s; }
         button:disabled { background-color: #7f8c8d !important; cursor: not-allowed; color: #fff !important; }
         .btn-send { background-color: #2980b9; color: #ffffff; flex: 1; font-size: 14px; }
         
         #sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 35; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; }
         #sidebar-overlay.open { opacity: 1; visibility: visible; }
+        
+        /* 左サイドバー */
         #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
         #sidebar-console.open { left: 0; }
         
+        /* 右サイドバー */
+        #right-sidebar { position: fixed; top: 0; right: -75vw; width: 75vw; height: 100dvh; background-color: #34495e; color: white; transition: right 0.3s ease; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); font-family: sans-serif; overflow-y: auto; }
+        #right-sidebar.open { right: 0; }
+        
         .console-section { border-bottom: 1px solid #7f8c8d; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
-        .console-section:last-child { border-bottom: none; }
-        .console-title { font-size: 14px; color: #ecf0f1; font-weight: bold; }
+        .console-section:last-child { border-bottom: none; padding-bottom: 0; }
+        .console-title { font-size: 14px; color: #ecf0f1; font-weight: bold; flex: none; text-align: left; }
         .btn-warning { background-color: #f39c12; color: #fff; padding: 12px; border-radius: 5px; width: 100%; text-align: center; border: none; font-size: 13px; cursor: pointer; font-weight: bold; }
         .btn-danger { background-color: #c0392b; color: #fff; padding: 12px; border-radius: 5px; width: 100%; text-align: center; border: none; font-size: 13px; cursor: pointer; font-weight: bold; }
         .btn-small { background-color: #2980b9; padding: 10px; border-radius: 5px; flex: 1; border: none; color: white; cursor: pointer; text-align: center; font-size: 13px; font-weight: bold; }
-        .console-textarea { width: 100%; height: 150px; resize: none; padding: 8px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
+        
+        /* 右サイドバー専用ボタン調整 */
+        .right-action-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+        .btn-action-save { background-color: #2980b9; padding: 6px 16px; border-radius: 4px; border: none; color: white; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-action-clear { background-color: #7f8c8d; padding: 6px 16px; border-radius: 4px; border: none; color: white; cursor: pointer; font-size: 12px; font-weight: bold; }
+
+        .console-textarea { width: 100%; resize: none; padding: 8px; border-radius: 5px; border: none; font-size: 14px; background: #ecf0f1; color: #2c3e50; line-height: 1.4; outline: none; }
         input[type=password], input[type=month], input[type=file] { width: 100%; padding: 10px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; padding: 10px 0; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #3498db; cursor: pointer; margin-top: -7px; }
@@ -53,6 +65,8 @@
 <body>
 
     <div id="sidebar-overlay"></div>
+    
+    <!-- 左サイドバー -->
     <div id="sidebar-console">
         <div class="console-section">
             <div class="console-title">API認証</div>
@@ -70,11 +84,6 @@
             </div>
         </div>
         <div class="console-section">
-            <div class="console-title">システムプロンプト（絶対法則）</div>
-            <textarea id="system-prompt-input" class="console-textarea" placeholder="絶対法則を入力"></textarea>
-            <button class="btn-small" id="save-prompt-btn" style="width: 100%;">プロンプト固定</button>
-        </div>
-        <div class="console-section">
             <div class="console-title">アーカイブ搬出 (指定月)</div>
             <input type="month" id="export-month-input">
             <button class="btn-small" id="export-btn" style="width: 100%;">JSONとして書き出し</button>
@@ -90,6 +99,50 @@
             <button class="btn-warning" id="copy-checked-btn">チェック項目をコピー</button>
             <button class="btn-warning" id="delete-checked-btn">チェック項目を削除</button>
             <button class="btn-danger" id="reset-btn" style="margin-top: 15px;">全ログ強制消去</button>
+        </div>
+    </div>
+
+    <!-- 右サイドバー（システム指示＆メモ領域） -->
+    <div id="right-sidebar">
+        <div class="console-section" style="flex: 3;">
+            <div class="console-title">システムプロンプト</div>
+            <textarea id="sys-prompt" class="console-textarea" style="flex-grow: 1;"></textarea>
+            <div class="right-action-row">
+                <button class="btn-action-save" data-target="sys-prompt">保存</button>
+                <button class="btn-action-clear" data-target="sys-prompt">消去</button>
+            </div>
+        </div>
+        <div class="console-section" style="flex: 3;">
+            <div class="console-title">Saved Information</div>
+            <textarea id="saved-info" class="console-textarea" style="flex-grow: 1;"></textarea>
+            <div class="right-action-row">
+                <button class="btn-action-save" data-target="saved-info">保存</button>
+                <button class="btn-action-clear" data-target="saved-info">消去</button>
+            </div>
+        </div>
+        <div class="console-section" style="flex: 2;">
+            <div class="console-title">メモ①</div>
+            <textarea id="memo1" class="console-textarea" style="flex-grow: 1;"></textarea>
+            <div class="right-action-row">
+                <button class="btn-action-save" data-target="memo1">保存</button>
+                <button class="btn-action-clear" data-target="memo1">消去</button>
+            </div>
+        </div>
+        <div class="console-section" style="flex: 2;">
+            <div class="console-title">メモ②</div>
+            <textarea id="memo2" class="console-textarea" style="flex-grow: 1;"></textarea>
+            <div class="right-action-row">
+                <button class="btn-action-save" data-target="memo2">保存</button>
+                <button class="btn-action-clear" data-target="memo2">消去</button>
+            </div>
+        </div>
+        <div class="console-section" style="flex: 2; border-bottom: none;">
+            <div class="console-title">メモ③</div>
+            <textarea id="memo3" class="console-textarea" style="flex-grow: 1;"></textarea>
+            <div class="right-action-row">
+                <button class="btn-action-save" data-target="memo3">保存</button>
+                <button class="btn-action-clear" data-target="memo3">消去</button>
+            </div>
         </div>
     </div>
 
@@ -130,12 +183,11 @@
     </div>
 
     <script>
-        // ServiceWorkerの抹消処理（古いキャッシュの亡霊を浄化）
+        // ServiceWorkerの抹消
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
                     registration.unregister();
-                    console.log('ServiceWorker 抹消完了');
                 }
             });
         }
@@ -162,12 +214,9 @@
 
         var STORAGE_KEY = "fleet_v18";
         var API_KEY_VAULT = "gemini_api_key";
-        var SYSTEM_PROMPT_VAULT = "gemini_system_prompt";
         var TOKEN_VAULT = "gemini_out_tokens";
         var INPUT_TOKEN_VAULT = "gemini_in_tokens";
         var WALTZ_COUNT_VAULT = "gemini_waltz_count";
-        
-        var CHAR_LIMIT = 200000;
         
         var chatLogArray = [];
         var totalOutputTokens = 0;
@@ -178,20 +227,35 @@
         var logArea = document.getElementById("log-window");
         var inputArea = document.getElementById("main-input");
         var sendBtn = document.querySelector(".btn-send");
+        
         var consolePanel = document.getElementById("sidebar-console");
+        var rightPanel = document.getElementById("right-sidebar");
         var overlay = document.getElementById("sidebar-overlay");
 
-        function openSidebar() {
-            consolePanel.classList.add("open");
-            overlay.classList.add("open");
-        }
-        function closeSidebar() {
+        function openSidebar() { consolePanel.classList.add("open"); overlay.classList.add("open"); }
+        function openRightSidebar() { rightPanel.classList.add("open"); overlay.classList.add("open"); }
+        function closeAllSidebars() {
             consolePanel.classList.remove("open");
+            rightPanel.classList.remove("open");
             overlay.classList.remove("open");
         }
 
-        document.getElementById("toggle-console-btn").onclick = openSidebar;
-        overlay.onclick = closeSidebar;
+        // ダブルタップ判定用のタイマー制御
+        var clickTimer = null;
+        document.getElementById("toggle-console-btn").addEventListener('click', function(e) {
+            if (clickTimer == null) {
+                clickTimer = setTimeout(function() {
+                    clickTimer = null;
+                    if (!rightPanel.classList.contains("open")) openSidebar(); 
+                }, 300); 
+            } else {
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                if (!consolePanel.classList.contains("open")) openRightSidebar(); 
+            }
+        });
+
+        overlay.onclick = closeAllSidebars;
 
         var touchStartX = 0;
         var touchStartY = 0;
@@ -214,12 +278,57 @@
             var yDiff = Math.abs(touchStartY - touchEndY);
             if (yDiff > Math.abs(xDiff)) return; 
 
-            if (xDiff > 50 && consolePanel.classList.contains("open")) {
-                closeSidebar(); 
-            } else if (xDiff < -50 && touchStartX < 30 && !consolePanel.classList.contains("open")) {
-                openSidebar(); 
+            if (xDiff > 50) { // 左スワイプ
+                if (consolePanel.classList.contains("open")) {
+                    closeAllSidebars();
+                } else if (touchStartX > window.innerWidth - 30 && !rightPanel.classList.contains("open")) {
+                    openRightSidebar();
+                }
+            } else if (xDiff < -50) { // 右スワイプ
+                if (rightPanel.classList.contains("open")) {
+                    closeAllSidebars();
+                } else if (touchStartX < 30 && !consolePanel.classList.contains("open")) {
+                    openSidebar();
+                }
             }
         }
+
+        // 右サイドバーの保存・消去ボタン処理（手応えの実装）
+        document.querySelectorAll('.btn-action-save').forEach(function(btn) {
+            btn.onclick = function() {
+                var targetId = this.getAttribute('data-target');
+                var val = document.getElementById(targetId).value;
+                var key = "gemini_" + targetId.replace('-', '_');
+                localStorage.setItem(key, val);
+                
+                var originalText = this.innerText;
+                this.innerText = "保存完了";
+                this.style.backgroundColor = "#27ae60"; 
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.style.backgroundColor = "#2980b9"; 
+                }, 1500);
+            };
+        });
+
+        document.querySelectorAll('.btn-action-clear').forEach(function(btn) {
+            btn.onclick = function() {
+                var targetId = this.getAttribute('data-target');
+                if (confirm("この領域のテキストを消去してよろしいですか？")) {
+                    document.getElementById(targetId).value = "";
+                    var key = "gemini_" + targetId.replace('-', '_');
+                    localStorage.removeItem(key);
+
+                    var originalText = this.innerText;
+                    this.innerText = "消去完了";
+                    this.style.backgroundColor = "#c0392b"; 
+                    setTimeout(() => {
+                        this.innerText = originalText;
+                        this.style.backgroundColor = "#7f8c8d"; 
+                    }, 1500);
+                }
+            };
+        });
 
         inputArea.addEventListener('input', function() {
             this.style.height = 'auto'; 
@@ -259,19 +368,14 @@
                 var dropped1 = chatLogArray.shift();
                 var dropped2 = chatLogArray.shift();
                 totalChars -= (dropped1.text.length + dropped2.text.length);
-                console.log("【ストレージ防衛】限界容量超過。最古のワルツを揮発させました。");
             }
         }
 
         function renderTimers(activeStr = "") {
             var container = document.getElementById("timer-container");
             var html = "";
-            timeHistory.forEach(function(t) {
-                html += `<span style="color:#333333;">${t}</span>`;
-            });
-            if (activeStr) {
-                html += `<span style="color:#333333;">${activeStr}</span>`;
-            }
+            timeHistory.forEach(function(t) { html += `<span style="color:#333333;">${t}</span>`; });
+            if (activeStr) html += `<span style="color:#333333;">${activeStr}</span>`;
             if (!html) html = '<span style="color:#333333;">0.0秒</span>';
             container.innerHTML = html;
         }
@@ -315,9 +419,14 @@
 
             var requestBody = { contents: geminiContents, tools: [{ googleSearch: {} }] };
 
-            var savedPrompt = localStorage.getItem(SYSTEM_PROMPT_VAULT);
-            if (savedPrompt && savedPrompt.trim() !== "") {
-                requestBody.systemInstruction = { parts: [{ text: savedPrompt }] };
+            var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
+            var savedInfo = localStorage.getItem("gemini_saved_info") || "";
+            var finalInstruction = sysPrompt;
+            if (savedInfo.trim() !== "") {
+                finalInstruction += "\n\n[Saved Information]\n" + savedInfo;
+            }
+            if (finalInstruction.trim() !== "") {
+                requestBody.systemInstruction = { parts: [{ text: finalInstruction }] };
             }
 
             requestBody.generationConfig = { temperature: parseFloat(document.getElementById("temp-slider").value) };
@@ -412,10 +521,17 @@
             var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT);
             if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
 
+            // 右サイドバーのデータ復元
+            var rightTextareas = ['sys-prompt', 'saved-info', 'memo1', 'memo2', 'memo3'];
+            rightTextareas.forEach(function(id) {
+                var key = "gemini_" + id.replace('-', '_');
+                var savedVal = localStorage.getItem(key);
+                if (savedVal) document.getElementById(id).value = savedVal;
+            });
+
             renderLogs();
             renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
-            if (localStorage.getItem(SYSTEM_PROMPT_VAULT)) document.getElementById("system-prompt-input").value = localStorage.getItem(SYSTEM_PROMPT_VAULT);
         };
 
         document.getElementById("copy-checked-btn").onclick = function() {
@@ -424,7 +540,7 @@
             var txt = checked.map(cb => chatLogArray[cb.value].text).join("\n\n---\n");
             navigator.clipboard.writeText(txt).then(() => {
                 alert(checked.length + "件の歴史をコピーしました。");
-                closeSidebar();
+                closeAllSidebars();
             });
         };
 
@@ -437,7 +553,7 @@
                 enforceMemoryLimit();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 renderLogs();
-                closeSidebar();
+                closeAllSidebars();
             }
         };
 
@@ -458,10 +574,6 @@
         
         document.getElementById("delete-key-btn").onclick = function() { localStorage.removeItem(API_KEY_VAULT); document.getElementById("api-key-input").value = ""; alert("消去完了"); };
         document.getElementById("temp-slider").oninput = function() { document.getElementById("temp-value").innerText = parseFloat(this.value).toFixed(1); };
-        document.getElementById("save-prompt-btn").onclick = function() {
-            localStorage.setItem(SYSTEM_PROMPT_VAULT, document.getElementById("system-prompt-input").value);
-            alert("大号令をシステムに固定しました。");
-        };
 
         document.getElementById("export-btn").onclick = function() {
             var monthVal = document.getElementById("export-month-input").value; 
@@ -518,14 +630,14 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
                 localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
                 renderLogs(); 
-                closeSidebar();
+                closeAllSidebars();
             } else if (chatLogArray.length === 1) {
                 chatLogArray.pop();
                 sessionWaltzCount = 0;
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
                 localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
                 renderLogs();
-                closeSidebar();
+                closeAllSidebars();
             }
         };
 
@@ -537,7 +649,7 @@
                 localStorage.setItem(WALTZ_COUNT_VAULT, 0);
                 timeHistory = []; renderTimers();
                 renderLogs(); 
-                closeSidebar();
+                closeAllSidebars();
             }
         };
 
