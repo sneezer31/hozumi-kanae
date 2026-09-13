@@ -367,14 +367,13 @@
                 var item = document.createElement('div');
                 item.className = 'memo-list-item' + (index === activeMemoIndex ? ' active' : '');
                 
-                // 1行目を抽出
                 var firstLine = memoText.split('\n')[0].trim();
                 item.innerText = firstLine === "" ? "(空白)" : firstLine;
                 
                 item.onclick = function() {
                     activeMemoIndex = index;
                     memoEditor.value = memoArray[index];
-                    renderMemoDial(); // 再描画してアクティブ表示を更新
+                    renderMemoDial(); 
                 };
                 memoListContainer.appendChild(item);
             });
@@ -387,7 +386,7 @@
         }
 
         document.getElementById('btn-add-memo').onclick = function() {
-            memoArray.unshift(""); // 新規メモを先頭に追加
+            memoArray.unshift(""); 
             activeMemoIndex = 0;
             saveMemosToStorage();
             renderMemoDial();
@@ -424,7 +423,6 @@
         }
 
         function migrateOldMemos() {
-            // 旧システム(memo1, memo2, memo3)からデータを回収し配列へ移行
             var m1 = localStorage.getItem('gemini_memo1');
             var m2 = localStorage.getItem('gemini_memo2');
             var m3 = localStorage.getItem('gemini_memo3');
@@ -434,9 +432,7 @@
             if (m2) { memoArray.push(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
             if (m3) { memoArray.push(m3); localStorage.removeItem('gemini_memo3'); migrated = true; }
             
-            if (migrated) {
-                saveMemosToStorage();
-            }
+            if (migrated) saveMemosToStorage();
         }
 
         // --- 以下共通処理 ---
@@ -572,7 +568,6 @@
             var rightTextareas = ['sys-prompt', 'saved-info'];
             rightTextareas.forEach(function(id) { var val = localStorage.getItem("gemini_" + id.replace('-', '_')); if (val) document.getElementById(id).value = val; });
 
-            // メモ配列の復元とマイグレーション
             var savedMemos = localStorage.getItem(MEMO_VAULT);
             if (savedMemos) memoArray = JSON.parse(savedMemos);
             migrateOldMemos();
@@ -626,11 +621,28 @@
             }; reader.readAsText(file);
         };
 
+        // ★修正済み：一手やり直し（Undo）のスマート削除ロジック
         document.getElementById("undo-btn").onclick = function() {
-            if (chatLogArray.length >= 2) { chatLogArray.pop(); chatLogArray.pop(); sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); } 
-            else if (chatLogArray.length === 1) { chatLogArray.pop(); sessionWaltzCount = 0; }
-            else return;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); renderLogs(); closeAllSidebars();
+            if (chatLogArray.length === 0) return;
+
+            var lastLog = chatLogArray[chatLogArray.length - 1];
+            
+            if (lastLog.sender === "船長") {
+                // 通信エラー時：船長の発言のみを削除
+                chatLogArray.pop();
+            } else {
+                // 正常時：AIと船長の1往復分を削除し、ワルツを減らす
+                chatLogArray.pop(); 
+                if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") {
+                    chatLogArray.pop(); 
+                }
+                sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); 
+            }
+            
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
+            localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); 
+            renderLogs(); 
+            closeAllSidebars();
         };
 
         document.getElementById("reset-btn").onclick = function() {
