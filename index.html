@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-    <title>マザーファイル：第19号（自律母艦仕様・メモコンソール搭載）</title>
+    <title>マザーファイル：第19.1号（自律母艦仕様・メモコンソール搭載）</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -173,9 +173,12 @@
             <!-- メモエディタ -->
             <div style="flex: 1; display: flex; flex-direction: column;">
                 <textarea id="memo-editor" class="console-textarea" style="flex:1; margin-bottom:8px;" placeholder="メモが選択されていません"></textarea>
-                <div class="right-action-row">
-                    <button id="btn-delete-memo" class="btn-action-clear" style="background:#c0392b;">このメモを削除</button>
-                    <button id="btn-save-memo" class="btn-action-save" style="width:50%;">保存・更新</button>
+                
+                <!-- 新設：転送ボタンを含む操作パネル -->
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-delete-memo" class="btn-action-clear" style="background:#c0392b; flex:1; padding: 10px 0;">削除</button>
+                    <button id="btn-transfer-memo" class="btn-action-save" style="background:#8e44ad; flex:1.5; padding: 10px 0;">入力欄へ転送</button>
+                    <button id="btn-save-memo" class="btn-action-save" style="flex:1.5; padding: 10px 0;">保存・更新</button>
                 </div>
             </div>
         </div>
@@ -305,6 +308,9 @@
 
         // --- 旧枠・新枠の保存処理 ---
         document.querySelectorAll('.btn-action-save').forEach(function(btn) {
+            // 転送ボタンは除外
+            if (btn.id === 'btn-transfer-memo') return;
+            
             btn.onclick = function() {
                 var targetId = this.getAttribute('data-target');
                 if (targetId) { // sys-prompt, saved-info等
@@ -320,6 +326,8 @@
         });
 
         document.querySelectorAll('.btn-action-clear').forEach(function(btn) {
+            if (btn.id === 'btn-delete-memo') return; // メモ削除は別処理
+            
             btn.onclick = function() {
                 var targetId = this.getAttribute('data-target');
                 if (targetId && confirm("この領域のテキストを消去してよろしいですか？")) {
@@ -404,6 +412,22 @@
                 btn.innerText = "更新完了";
                 btn.style.backgroundColor = "#27ae60"; 
                 setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "#2980b9"; }, 1500);
+            }
+        };
+
+        // ★新設：メモの内容をメイン入力欄へ転送する処理
+        document.getElementById('btn-transfer-memo').onclick = function() {
+            if (activeMemoIndex >= 0 && memoEditor.value !== "") {
+                var inputEl = document.getElementById("main-input");
+                inputEl.value = memoEditor.value;
+                
+                // 入力欄の高さを自動調整
+                inputEl.style.height = 'auto';
+                inputEl.style.height = inputEl.scrollHeight + 'px';
+                
+                // サイドバーを閉じて、メイン入力欄にフォーカスを当てる
+                closeAllSidebars();
+                inputEl.focus();
             }
         };
 
@@ -621,28 +645,16 @@
             }; reader.readAsText(file);
         };
 
-        // ★修正済み：一手やり直し（Undo）のスマート削除ロジック
         document.getElementById("undo-btn").onclick = function() {
             if (chatLogArray.length === 0) return;
-
             var lastLog = chatLogArray[chatLogArray.length - 1];
-            
-            if (lastLog.sender === "船長") {
-                // 通信エラー時：船長の発言のみを削除
-                chatLogArray.pop();
-            } else {
-                // 正常時：AIと船長の1往復分を削除し、ワルツを減らす
+            if (lastLog.sender === "船長") { chatLogArray.pop(); } 
+            else {
                 chatLogArray.pop(); 
-                if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") {
-                    chatLogArray.pop(); 
-                }
+                if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") { chatLogArray.pop(); }
                 sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); 
             }
-            
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); 
-            localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); 
-            renderLogs(); 
-            closeAllSidebars();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); renderLogs(); closeAllSidebars();
         };
 
         document.getElementById("reset-btn").onclick = function() {
