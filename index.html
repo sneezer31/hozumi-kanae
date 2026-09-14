@@ -85,7 +85,6 @@
         .view-hidden { display: none !important; }
         #rs-view-main, #rs-view-memos { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* メモのダイヤル（リスト）スタイル */
         #memo-list-container { flex: 1; overflow-y: auto; background: #2c3e50; border: 1px solid #7f8c8d; border-radius: 5px; margin-bottom: 10px; max-height: 40%; }
         .memo-list-item { padding: 10px 12px; border-bottom: 1px solid #7f8c8d; cursor: pointer; font-size: 13px; color: #bdc3c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .memo-list-item:hover { background-color: #34495e; color: #fff; }
@@ -114,9 +113,13 @@
             </div>
         </div>
         <div class="console-section">
-            <div class="console-title">アーカイブ搬出 (指定月)</div>
-            <input type="month" id="export-month-input">
-            <button class="btn-small" id="export-btn" style="width: 100%;">JSONとして書き出し</button>
+            <div class="console-title">アーカイブ搬出</div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="month" id="export-month-input" style="flex: 1;">
+                <button class="btn-small" id="export-btn" style="flex: none; width: 60px;">月別</button>
+            </div>
+            <!-- 【改修】チャンク化ボタン追加 -->
+            <button class="btn-small" id="chunk-export-btn" style="width: 100%; background-color: #8e44ad;">最古の5万字を退避（チャンク化）</button>
         </div>
         <div class="console-section">
             <div class="console-title">歴史の搬入</div>
@@ -134,7 +137,6 @@
 
     <!-- 右サイドバー（SPA仕様） -->
     <div id="right-sidebar">
-        <!-- ▽ View A: メイン画面（システムプロンプト等） ▽ -->
         <div id="rs-view-main">
             <div class="console-section" style="flex: 1;">
                 <textarea id="sys-prompt" class="console-textarea" style="flex-grow: 1;"></textarea>
@@ -159,7 +161,6 @@
             <button id="btn-open-memos" class="btn-warning" style="margin-top: 15px; flex: none;">メモコンソールを開く</button>
         </div>
 
-        <!-- ▽ View B: メモコンソール画面 ▽ -->
         <div id="rs-view-memos" class="view-hidden">
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                 <button id="btn-back-main" class="btn-small" style="background:#7f8c8d; flex:none; width:60px;">＜ 戻る</button>
@@ -167,14 +168,10 @@
                 <button id="btn-add-memo" class="btn-small" style="flex:none; width:60px;">＋ 新規</button>
             </div>
             
-            <!-- メモダイヤル（リスト） -->
             <div id="memo-list-container"></div>
             
-            <!-- メモエディタ -->
             <div style="flex: 1; display: flex; flex-direction: column;">
                 <textarea id="memo-editor" class="console-textarea" style="flex:1; margin-bottom:8px;" placeholder="メモが選択されていません"></textarea>
-                
-                <!-- 新設：転送ボタンを含む操作パネル -->
                 <div style="display: flex; gap: 8px;">
                     <button id="btn-delete-memo" class="btn-action-clear" style="background:#c0392b; flex:1; padding: 10px 0;">削除</button>
                     <button id="btn-transfer-memo" class="btn-action-save" style="background:#8e44ad; flex:1.5; padding: 10px 0;">入力欄へ転送</button>
@@ -223,21 +220,12 @@
         }
 
         if (window.visualViewport) {
-            function updateBodyHeight() {
-                document.body.style.height = window.visualViewport.height + "px";
-                window.scrollTo(0, 0); 
-            }
+            function updateBodyHeight() { document.body.style.height = window.visualViewport.height + "px"; window.scrollTo(0, 0); }
             window.visualViewport.addEventListener("resize", function() {
-                updateBodyHeight(); 
-                setTimeout(function() {
-                    updateBodyHeight();
-                    document.getElementById("control-area").scrollIntoView(false);
-                }, 400);
+                updateBodyHeight(); setTimeout(function() { updateBodyHeight(); document.getElementById("control-area").scrollIntoView(false); }, 400);
             });
             document.getElementById("main-input").addEventListener("focus", function() {
-                setTimeout(function() {
-                    document.getElementById("control-area").scrollIntoView(false);
-                }, 400);
+                setTimeout(function() { document.getElementById("control-area").scrollIntoView(false); }, 400);
             });
             updateBodyHeight();
         }
@@ -268,24 +256,15 @@
 
         function openSidebar() { consolePanel.classList.add("open"); overlay.classList.add("open"); }
         function openRightSidebar() { rightPanel.classList.add("open"); overlay.classList.add("open"); }
-        function closeAllSidebars() {
-            consolePanel.classList.remove("open");
-            rightPanel.classList.remove("open");
-            overlay.classList.remove("open");
-        }
+        function closeAllSidebars() { consolePanel.classList.remove("open"); rightPanel.classList.remove("open"); overlay.classList.remove("open"); }
         overlay.onclick = closeAllSidebars;
 
         var clickTimer = null;
         document.getElementById("toggle-console-btn").addEventListener('click', function(e) {
             if (clickTimer == null) {
-                clickTimer = setTimeout(function() {
-                    clickTimer = null;
-                    if (!rightPanel.classList.contains("open")) openSidebar(); 
-                }, 300); 
+                clickTimer = setTimeout(function() { clickTimer = null; if (!rightPanel.classList.contains("open")) openSidebar(); }, 300); 
             } else {
-                clearTimeout(clickTimer);
-                clickTimer = null;
-                if (!consolePanel.classList.contains("open")) openRightSidebar(); 
+                clearTimeout(clickTimer); clickTimer = null; if (!consolePanel.classList.contains("open")) openRightSidebar(); 
             }
         });
 
@@ -297,177 +276,96 @@
             var xDiff = touchStartX - touchEndX;
             var yDiff = Math.abs(touchStartY - touchEndY);
             if (yDiff > Math.abs(xDiff)) return; 
-            if (xDiff > 50) { 
-                if (consolePanel.classList.contains("open")) closeAllSidebars();
-                else if (touchStartX > window.innerWidth - 100 && !rightPanel.classList.contains("open")) openRightSidebar(); 
-            } else if (xDiff < -50) { 
-                if (rightPanel.classList.contains("open")) closeAllSidebars();
-                else if (touchStartX < 100 && !consolePanel.classList.contains("open")) openSidebar(); 
-            }
+            if (xDiff > 50) { if (consolePanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX > window.innerWidth - 100 && !rightPanel.classList.contains("open")) openRightSidebar(); } 
+            else if (xDiff < -50) { if (rightPanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX < 100 && !consolePanel.classList.contains("open")) openSidebar(); }
         }
 
-        // --- 旧枠・新枠の保存処理 ---
         document.querySelectorAll('.btn-action-save').forEach(function(btn) {
-            // 転送ボタンは除外
             if (btn.id === 'btn-transfer-memo') return;
-            
             btn.onclick = function() {
                 var targetId = this.getAttribute('data-target');
-                if (targetId) { // sys-prompt, saved-info等
-                    var val = document.getElementById(targetId).value;
-                    var key = "gemini_" + targetId.replace('-', '_');
-                    localStorage.setItem(key, val);
-                }
-                var originalText = this.innerText;
-                this.innerText = "保存完了";
-                this.style.backgroundColor = "#27ae60"; 
+                if (targetId) { var val = document.getElementById(targetId).value; localStorage.setItem("gemini_" + targetId.replace('-', '_'), val); }
+                var originalText = this.innerText; this.innerText = "保存完了"; this.style.backgroundColor = "#27ae60"; 
                 setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#2980b9"; }, 1500);
             };
         });
 
         document.querySelectorAll('.btn-action-clear').forEach(function(btn) {
-            if (btn.id === 'btn-delete-memo') return; // メモ削除は別処理
-            
+            if (btn.id === 'btn-delete-memo') return;
             btn.onclick = function() {
                 var targetId = this.getAttribute('data-target');
                 if (targetId && confirm("この領域のテキストを消去してよろしいですか？")) {
-                    document.getElementById(targetId).value = "";
-                    var key = "gemini_" + targetId.replace('-', '_');
-                    localStorage.removeItem(key);
-                    var originalText = this.innerText;
-                    this.innerText = "消去完了";
-                    this.style.backgroundColor = "#c0392b"; 
+                    document.getElementById(targetId).value = ""; localStorage.removeItem("gemini_" + targetId.replace('-', '_'));
+                    var originalText = this.innerText; this.innerText = "消去完了"; this.style.backgroundColor = "#c0392b"; 
                     setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#7f8c8d"; }, 1500);
                 }
             };
         });
 
-        // ----------------------------------------------------
-        // [SPA実装] メモコンソールのロジック
-        // ----------------------------------------------------
         var viewMain = document.getElementById('rs-view-main');
         var viewMemos = document.getElementById('rs-view-memos');
         var memoListContainer = document.getElementById('memo-list-container');
         var memoEditor = document.getElementById('memo-editor');
 
-        document.getElementById('btn-open-memos').onclick = function() {
-            viewMain.classList.add('view-hidden');
-            viewMemos.classList.remove('view-hidden');
-            renderMemoDial();
-        };
-
-        document.getElementById('btn-back-main').onclick = function() {
-            viewMemos.classList.add('view-hidden');
-            viewMain.classList.remove('view-hidden');
-        };
+        document.getElementById('btn-open-memos').onclick = function() { viewMain.classList.add('view-hidden'); viewMemos.classList.remove('view-hidden'); renderMemoDial(); };
+        document.getElementById('btn-back-main').onclick = function() { viewMemos.classList.add('view-hidden'); viewMain.classList.remove('view-hidden'); };
 
         function renderMemoDial() {
             memoListContainer.innerHTML = '';
             if (memoArray.length === 0) {
                 memoListContainer.innerHTML = '<div style="padding: 15px; color:#7f8c8d; text-align:center; font-size:12px;">メモがありません。[＋新規]から作成してください。</div>';
-                memoEditor.value = '';
-                memoEditor.disabled = true;
-                return;
+                memoEditor.value = ''; memoEditor.disabled = true; return;
             }
             memoEditor.disabled = false;
-            
             memoArray.forEach(function(memoText, index) {
-                var item = document.createElement('div');
-                item.className = 'memo-list-item' + (index === activeMemoIndex ? ' active' : '');
-                
-                var firstLine = memoText.split('\n')[0].trim();
-                item.innerText = firstLine === "" ? "(空白)" : firstLine;
-                
-                item.onclick = function() {
-                    activeMemoIndex = index;
-                    memoEditor.value = memoArray[index];
-                    renderMemoDial(); 
-                };
+                var item = document.createElement('div'); item.className = 'memo-list-item' + (index === activeMemoIndex ? ' active' : '');
+                var firstLine = memoText.split('\n')[0].trim(); item.innerText = firstLine === "" ? "(空白)" : firstLine;
+                item.onclick = function() { activeMemoIndex = index; memoEditor.value = memoArray[index]; renderMemoDial(); };
                 memoListContainer.appendChild(item);
             });
-            
-            if (activeMemoIndex >= 0 && activeMemoIndex < memoArray.length) {
-                memoEditor.value = memoArray[activeMemoIndex];
-            } else {
-                memoEditor.value = '';
-            }
+            if (activeMemoIndex >= 0 && activeMemoIndex < memoArray.length) { memoEditor.value = memoArray[activeMemoIndex]; } 
+            else { memoEditor.value = ''; }
         }
 
-        document.getElementById('btn-add-memo').onclick = function() {
-            memoArray.unshift(""); 
-            activeMemoIndex = 0;
-            saveMemosToStorage();
-            renderMemoDial();
-            memoEditor.focus();
-        };
+        document.getElementById('btn-add-memo').onclick = function() { memoArray.unshift(""); activeMemoIndex = 0; saveMemosToStorage(); renderMemoDial(); memoEditor.focus(); };
 
         document.getElementById('btn-save-memo').onclick = function() {
             if (activeMemoIndex >= 0) {
-                memoArray[activeMemoIndex] = memoEditor.value;
-                saveMemosToStorage();
-                renderMemoDial();
-                
-                var btn = this;
-                var originalText = btn.innerText;
-                btn.innerText = "更新完了";
-                btn.style.backgroundColor = "#27ae60"; 
+                memoArray[activeMemoIndex] = memoEditor.value; saveMemosToStorage(); renderMemoDial();
+                var btn = this; var originalText = btn.innerText; btn.innerText = "更新完了"; btn.style.backgroundColor = "#27ae60"; 
                 setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "#2980b9"; }, 1500);
             }
         };
 
-        // ★新設：メモの内容をメイン入力欄へ転送する処理
         document.getElementById('btn-transfer-memo').onclick = function() {
             if (activeMemoIndex >= 0 && memoEditor.value !== "") {
-                var inputEl = document.getElementById("main-input");
-                inputEl.value = memoEditor.value;
-                
-                // 入力欄の高さを自動調整
-                inputEl.style.height = 'auto';
-                inputEl.style.height = inputEl.scrollHeight + 'px';
-                
-                // サイドバーを閉じて、メイン入力欄にフォーカスを当てる
-                closeAllSidebars();
-                inputEl.focus();
+                var inputEl = document.getElementById("main-input"); inputEl.value = memoEditor.value;
+                inputEl.style.height = 'auto'; inputEl.style.height = inputEl.scrollHeight + 'px';
+                closeAllSidebars(); inputEl.focus();
             }
         };
 
         document.getElementById('btn-delete-memo').onclick = function() {
             if (activeMemoIndex >= 0) {
-                if (confirm("このメモを完全に削除しますか？")) {
-                    memoArray.splice(activeMemoIndex, 1);
-                    activeMemoIndex = memoArray.length > 0 ? 0 : -1;
-                    saveMemosToStorage();
-                    renderMemoDial();
-                }
+                if (confirm("このメモを完全に削除しますか？")) { memoArray.splice(activeMemoIndex, 1); activeMemoIndex = memoArray.length > 0 ? 0 : -1; saveMemosToStorage(); renderMemoDial(); }
             }
         };
 
-        function saveMemosToStorage() {
-            localStorage.setItem(MEMO_VAULT, JSON.stringify(memoArray));
-        }
-
+        function saveMemosToStorage() { localStorage.setItem(MEMO_VAULT, JSON.stringify(memoArray)); }
         function migrateOldMemos() {
-            var m1 = localStorage.getItem('gemini_memo1');
-            var m2 = localStorage.getItem('gemini_memo2');
-            var m3 = localStorage.getItem('gemini_memo3');
-            
+            var m1 = localStorage.getItem('gemini_memo1'); var m2 = localStorage.getItem('gemini_memo2'); var m3 = localStorage.getItem('gemini_memo3');
             var migrated = false;
             if (m1) { memoArray.push(m1); localStorage.removeItem('gemini_memo1'); migrated = true; }
             if (m2) { memoArray.push(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
             if (m3) { memoArray.push(m3); localStorage.removeItem('gemini_memo3'); migrated = true; }
-            
             if (migrated) saveMemosToStorage();
         }
 
-        // --- 以下共通処理 ---
         inputArea.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
-        inputArea.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!sendBtn.disabled) sendBtn.click(); }
-        });
+        inputArea.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!sendBtn.disabled) sendBtn.click(); } });
 
         function getFormattedTime() {
-            var now = new Date();
-            var yyyy = now.getFullYear(); var mm = ("0" + (now.getMonth() + 1)).slice(-2); var dd = ("0" + now.getDate()).slice(-2);
+            var now = new Date(); var yyyy = now.getFullYear(); var mm = ("0" + (now.getMonth() + 1)).slice(-2); var dd = ("0" + now.getDate()).slice(-2);
             var dayStr = ["日", "月", "火", "水", "木", "金", "土"][now.getDay()];
             var hh = ("0" + now.getHours()).slice(-2); var min = ("0" + now.getMinutes()).slice(-2);
             return yyyy + "/" + mm + "/" + dd + "(" + dayStr + ") " + hh + ":" + min;
@@ -485,14 +383,12 @@
             var STORAGE_LIMIT = 2000000; 
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
             while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
-                var dropped1 = chatLogArray.shift(); var dropped2 = chatLogArray.shift();
-                totalChars -= (dropped1.text.length + dropped2.text.length);
+                var dropped1 = chatLogArray.shift(); var dropped2 = chatLogArray.shift(); totalChars -= (dropped1.text.length + dropped2.text.length);
             }
         }
 
         function renderTimers(activeStr = "") {
-            var container = document.getElementById("timer-container");
-            var html = "";
+            var container = document.getElementById("timer-container"); var html = "";
             timeHistory.forEach(function(t) { html += `<span style="color:#333333;">${t}</span>`; });
             if (activeStr) html += `<span style="color:#333333;">${activeStr}</span>`;
             if (!html) html = '<span style="color:#333333;">0.0秒</span>';
@@ -500,10 +396,10 @@
         }
 
         async function fetchGeminiAPI() {
-            var apiKey = localStorage.getItem(API_KEY_VAULT);
-            if (!apiKey) { alert("APIキーがありません。"); return null; }
+            var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
 
-            var API_WINDOW_LIMIT = 70000; 
+            // 【改修①】スライディングウィンドウの限界値を10万字に変更
+            var API_WINDOW_LIMIT = 100000; 
             var sendLogs = [];
             var charCount = 0;
             for (var i = chatLogArray.length - 1; i >= 0; i--) {
@@ -520,13 +416,9 @@
                 var role = log.sender === "船長" ? "user" : "model";
                 var timeStr = log.time ? "【" + log.time + "】\n" : "";
                 var currentText = timeStr + log.text;
-
                 var lastContent = geminiContents[geminiContents.length - 1];
-                if (lastContent && lastContent.role === role) {
-                    lastContent.parts[0].text += "\n\n" + currentText; 
-                } else {
-                    geminiContents.push({ role: role, parts: [{ text: currentText }] });
-                }
+                if (lastContent && lastContent.role === role) { lastContent.parts[0].text += "\n\n" + currentText; } 
+                else { geminiContents.push({ role: role, parts: [{ text: currentText }] }); }
             });
 
             if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role !== "user") { geminiContents.pop(); }
@@ -538,9 +430,7 @@
             var savedInfo = localStorage.getItem("gemini_saved_info") || "";
             var finalInstruction = sysPrompt;
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
-            
             finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
-
             if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
 
             requestBody.generationConfig = { temperature: parseFloat(document.getElementById("temp-slider").value) };
@@ -549,11 +439,8 @@
             try {
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
                 var data = await response.json();
-
                 if (data.error) { alert("APIからの拒否理由: " + data.error.message); return null; }
-                if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") {
-                    return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？";
-                }
+                if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") { return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？"; }
                 if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) { alert("異常データ受信: " + JSON.stringify(data).substring(0, 300)); return null; }            
 
                 if (data.candidates && data.candidates[0].content.parts[0].text) {
@@ -594,18 +481,17 @@
 
             var savedMemos = localStorage.getItem(MEMO_VAULT);
             if (savedMemos) memoArray = JSON.parse(savedMemos);
-            migrateOldMemos();
-            if (memoArray.length > 0) activeMemoIndex = 0;
+            migrateOldMemos(); if (memoArray.length > 0) activeMemoIndex = 0;
 
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
         };
 
-        // UIボタンアクション群
         document.getElementById("copy-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if(!checked.length) return;
             navigator.clipboard.writeText(checked.map(cb => chatLogArray[cb.value].text).join("\n\n---\n")).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
         };
+        
         document.getElementById("delete-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if (!checked.length) return;
             if (confirm(checked.length + "件の歴史を削除しますか？")) {
@@ -614,12 +500,14 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); closeAllSidebars();
             }
         };
+
         document.getElementById("reset-meter-btn").onclick = function() {
             if (confirm("トークンとワルツのメーターをゼロにリセットしますか？（歴史は保持されます）")) {
                 totalOutputTokens = 0; localStorage.setItem(TOKEN_VAULT, 0); totalInputTokens = 0; localStorage.setItem(INPUT_TOKEN_VAULT, 0);
                 sessionWaltzCount = 0; localStorage.setItem(WALTZ_COUNT_VAULT, 0); timeHistory = []; renderTimers(); updateRadar();
             }
         };
+        
         document.getElementById("save-key-btn").onclick = function() { var key = document.getElementById("api-key-input").value; if (key && key !== "********") { localStorage.setItem(API_KEY_VAULT, key); document.getElementById("api-key-input").value = "********"; alert("保存完了"); } };
         document.getElementById("delete-key-btn").onclick = function() { localStorage.removeItem(API_KEY_VAULT); document.getElementById("api-key-input").value = ""; alert("消去完了"); };
         document.getElementById("temp-slider").oninput = function() { document.getElementById("temp-value").innerText = parseFloat(this.value).toFixed(1); };
@@ -631,6 +519,45 @@
             var url = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' }));
             var a = document.createElement("a"); a.href = url; a.download = "log_" + monthVal + ".json"; a.click(); URL.revokeObjectURL(url);
         };
+
+        // 【改修②③】チャンク化エクスポート処理
+        document.getElementById("chunk-export-btn").onclick = function() {
+            if (chatLogArray.length === 0) { alert("退避する歴史がありません。"); return; }
+            
+            var chunkLogs = [];
+            var charCount = 0;
+            var splitIndex = 0;
+            
+            for (var i = 0; i < chatLogArray.length; i++) {
+                charCount += chatLogArray[i].text.length;
+                chunkLogs.push(chatLogArray[i]);
+                splitIndex = i + 1;
+                // 5万字を超過し、かつ対話の区切り（AIの返答）で分割する
+                if (charCount >= 50000 && chatLogArray[i].sender !== "船長") {
+                    break;
+                }
+            }
+            
+            if (charCount < 30000 && chatLogArray.length === chunkLogs.length) {
+                if (!confirm("まだ5万字に達していません（現在約" + charCount + "字）。このまま全ての履歴を退避しますか？")) return;
+            } else {
+                if (!confirm("最古の対話から約" + charCount + "字をチャンク化し、母艦の記憶から切り離して退避しますか？")) return;
+            }
+            
+            // JSONファイルとしてダウンロード
+            var nowStr = getFormattedTime().replace(/[^0-9]/g, "");
+            var url = URL.createObjectURL(new Blob([JSON.stringify(chunkLogs, null, 2)], { type: 'application/json' }));
+            var a = document.createElement("a"); a.href = url; a.download = "chunk_50k_" + nowStr + ".json"; a.click(); URL.revokeObjectURL(url);
+            
+            // 母艦の配列から該当分を削除して更新
+            chatLogArray.splice(0, splitIndex);
+            enforceMemoryLimit();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
+            renderLogs();
+            closeAllSidebars();
+            alert("チャンク化と母艦からの切り離しが完了しました！");
+        };
+
         document.getElementById("import-btn").onclick = function() {
             var file = document.getElementById("import-file-input").files[0]; if (!file) { alert("ファイルを選択してください。"); return; }
             var reader = new FileReader();
@@ -649,11 +576,7 @@
             if (chatLogArray.length === 0) return;
             var lastLog = chatLogArray[chatLogArray.length - 1];
             if (lastLog.sender === "船長") { chatLogArray.pop(); } 
-            else {
-                chatLogArray.pop(); 
-                if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") { chatLogArray.pop(); }
-                sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); 
-            }
+            else { chatLogArray.pop(); if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") { chatLogArray.pop(); } sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); renderLogs(); closeAllSidebars();
         };
 
