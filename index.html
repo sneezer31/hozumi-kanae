@@ -245,6 +245,11 @@
         var sessionWaltzCount = 0;
         var timeHistory = []; 
 
+        // 【追加】明示的キャッシュ管理用のグローバル状態
+        var activeCacheName = null;
+        var activeCacheLength = 0;
+        var activeCacheExpiry = 0;
+
         var logArea = document.getElementById("log-window");
         var inputArea = document.getElementById("main-input");
         var sendBtn = document.querySelector(".btn-send");
@@ -394,43 +399,93 @@
             container.innerHTML = html;
         }
 
+        // 【換装済】明示的キャッシュ（Explicit Caching）対応エンジン
         async function fetchGeminiAPI() {
             var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
 
-            // 【改修①】お節介な切り取りを撤去し、母艦の歴史をありのまま全件送信（キャッシュ最大化）
             var sendLogs = chatLogArray.slice();
-
             while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
             if (sendLogs.length === 0) return null;
 
-            var geminiContents = [];
+            // 1. 全ペイロードの構築
+            var allContents = [];
             sendLogs.forEach(function(log) {
                 var role = log.sender === "船長" ? "user" : "model";
                 var timeStr = log.time ? "【" + log.time + "】\n" : "";
                 var currentText = timeStr + log.text;
-                var lastContent = geminiContents[geminiContents.length - 1];
-                if (lastContent && lastContent.role === role) { lastContent.parts[0].text += "\n\n" + currentText; } 
-                else { geminiContents.push({ role: role, parts: [{ text: currentText }] }); }
+                var lastContent = allContents[allContents.length - 1];
+                if (lastContent && lastContent.role === role) { 
+                    lastContent.parts[0].text += "\n\n" + currentText; 
+                } else { 
+                    allContents.push({ role: role, parts: [{ text: currentText }] }); 
+                }
             });
+            if (allContents.length > 0 && allContents[allContents.length - 1].role !== "user") { allContents.pop(); }
+            if (allContents.length === 0) return null;
 
-            if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role !== "user") { geminiContents.pop(); }
-            if (geminiContents.length === 0) return null;
-
-            var requestBody = { contents: geminiContents, tools: [{ googleSearch: {} }] };
-
+            // 2. システムプロンプト（セーブドインフォメーション）の構築
             var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
             var savedInfo = localStorage.getItem("gemini_saved_info") || "";
             var finalInstruction = sysPrompt;
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
             finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
-            if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
+            
+            var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
-            requestBody.generationConfig = { temperature: parseFloat(document.getElementById("temp-slider").value) };
+            // 3. 【明示的キャッシュの構築判定】
+            let cacheTargetLength = allContents.length - 1;
+            let now = Date.now();
+
+            if (cacheTargetLength > 4 && (!activeCacheName || activeCacheExpiry < now || activeCacheLength < cacheTargetLength - 4)) {
+                let cacheContents = allContents.slice(0, cacheTargetLength);
+                let cacheBody = {
+                    model: "models/gemini-3.6-flash",
+                    contents: cacheContents,
+                    systemInstruction: sysInstObj,
+                    ttl: "3600s"
+                };
+                
+                try {
+                    let cacheRes = await fetch("https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" + apiKey, {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
+                    });
+                    let cacheData = await cacheRes.json();
+                    
+                    if (cacheData.name) {
+                        activeCacheName = cacheData.name;
+                        activeCacheLength = cacheTargetLength;
+                        activeCacheExpiry = new Date(cacheData.expireTime).getTime() - 60000;
+                        console.log("【システム】明示的キャッシュを生成しました: " + activeCacheName);
+                    } else if (cacheData.error && cacheData.error.code === 400 && cacheData.error.message.includes("minimum")) {
+                        console.log("【システム】トークン数が閾値（約32k）未満のため、通常通信を行います。");
+                        activeCacheName = null;
+                    }
+                } catch (e) { 
+                    console.error("キャッシュ生成エラー", e); 
+                    activeCacheName = null; 
+                }
+            }
+
+            // 4. 生成リクエストの組み立て
+            var requestBody = { 
+                tools: [{ googleSearch: {} }], 
+                generationConfig: { temperature: parseFloat(document.getElementById("temp-slider").value) } 
+            };
+
+            if (activeCacheName) {
+                requestBody.cachedContent = activeCacheName;
+                requestBody.contents = allContents.slice(activeCacheLength);
+            } else {
+                requestBody.contents = allContents;
+                if (sysInstObj) requestBody.systemInstruction = sysInstObj;
+            }
+
             var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
 
             try {
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
                 var data = await response.json();
+                
                 if (data.error) { alert("APIからの拒否理由: " + data.error.message); return null; }
                 if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") { return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？"; }
                 if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) { alert("異常データ受信: " + JSON.stringify(data).substring(0, 300)); return null; }            
