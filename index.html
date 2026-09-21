@@ -437,8 +437,7 @@
             var allContents = [];
             sendLogs.forEach(function(log) {
                 var role = log.sender === "船長" ? "user" : "model";
-                var timeStr = log.time ? "【" + log.time + "】\n" : "";
-                var currentText = timeStr + log.text;
+                var currentText = log.text; 
                 var lastContent = allContents[allContents.length - 1];
                 if (lastContent && lastContent.role === role) { 
                     lastContent.parts[0].text += "\n\n" + currentText; 
@@ -454,6 +453,8 @@
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
             finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
             
+            finalInstruction += "\n\n【システム現在時刻】\n" + getFormattedTime();
+
             var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
             let cacheBody = {
@@ -505,8 +506,7 @@
             var allContents = [];
             sendLogs.forEach(function(log) {
                 var role = log.sender === "船長" ? "user" : "model";
-                var timeStr = log.time ? "【" + log.time + "】\n" : "";
-                var currentText = timeStr + log.text;
+                var currentText = log.text; 
                 var lastContent = allContents[allContents.length - 1];
                 if (lastContent && lastContent.role === role) { 
                     lastContent.parts[0].text += "\n\n" + currentText; 
@@ -534,6 +534,9 @@
                 var finalInstruction = sysPrompt;
                 if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
                 finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
+                
+                finalInstruction += "\n\n【システム現在時刻】\n" + getFormattedTime();
+
                 if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
             }
 
@@ -603,7 +606,12 @@
 
         document.getElementById("copy-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if(!checked.length) return;
-            navigator.clipboard.writeText(checked.map(cb => chatLogArray[cb.value].text).join("\n\n---\n")).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
+            var copyText = checked.map(cb => {
+                var log = chatLogArray[cb.value];
+                var senderName = log.sender === "船長" ? "船長：" : "かなえ：";
+                return (log.time ? "【" + log.time + "】 " : "") + senderName + "\n" + log.text;
+            }).join("\n\n---\n");
+            navigator.clipboard.writeText(copyText).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
         };
         
         document.getElementById("delete-checked-btn").onclick = function() {
