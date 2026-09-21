@@ -97,6 +97,14 @@
     
     <!-- 左サイドバー -->
     <div id="sidebar-console">
+        <!-- 【追加】明示的キャッシュの手動操作パネル -->
+        <div class="console-section">
+            <div class="console-title">通信コスト統制（キャッシュ）</div>
+            <div style="font-size: 12px; color: #bdc3c7; margin-bottom: 5px; font-family: monospace;" id="cache-status-text">状態: 未凍結（フル送信）</div>
+            <button class="btn-warning" style="background-color: #27ae60;" id="create-cache-btn">現在の歴史を凍結 (1時間)</button>
+            <button class="btn-warning" style="background-color: #7f8c8d; display: none;" id="clear-cache-btn">凍結解除（通常通信へ戻す）</button>
+        </div>
+
         <div class="console-section">
             <div class="console-title">API認証</div>
             <input type="password" id="api-key-input" placeholder="APIキーを入力">
@@ -245,7 +253,7 @@
         var sessionWaltzCount = 0;
         var timeHistory = []; 
 
-        // 【追加】明示的キャッシュ管理用のグローバル状態
+        // 【新設】手動明示的キャッシュ管理用の状態変数
         var activeCacheName = null;
         var activeCacheLength = 0;
         var activeCacheExpiry = 0;
@@ -384,7 +392,7 @@
         }
 
         function enforceMemoryLimit() {
-            var STORAGE_LIMIT = 2000000; // ブラウザクラッシュ防止の最終防衛ライン
+            var STORAGE_LIMIT = 2000000;
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
             while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
                 var dropped1 = chatLogArray.shift(); var dropped2 = chatLogArray.shift(); totalChars -= (dropped1.text.length + dropped2.text.length);
@@ -399,15 +407,41 @@
             container.innerHTML = html;
         }
 
-        // 【換装済】明示的キャッシュ（Explicit Caching）対応エンジン
-        async function fetchGeminiAPI() {
-            var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
+        // ========================================================
+        // 【新設】手動キャッシュ管理UIの更新機構
+        // ========================================================
+        function updateCacheUI() {
+            var statusText = document.getElementById("cache-status-text");
+            var createBtn = document.getElementById("create-cache-btn");
+            var clearBtn = document.getElementById("clear-cache-btn");
+
+            if (activeCacheName && activeCacheExpiry > Date.now()) {
+                var remainMin = Math.floor((activeCacheExpiry - Date.now()) / 60000);
+                statusText.innerText = "状態: 凍結中 (残り約" + remainMin + "分)";
+                statusText.style.color = "#f1c40f";
+                createBtn.style.display = "none";
+                clearBtn.style.display = "block";
+            } else {
+                activeCacheName = null;
+                statusText.innerText = "状態: 未凍結（フル送信）";
+                statusText.style.color = "#bdc3c7";
+                createBtn.style.display = "block";
+                clearBtn.style.display = "none";
+            }
+        }
+
+        // 【新設】手動による明示的キャッシュ生成イベント
+        document.getElementById("create-cache-btn").onclick = async function() {
+            var apiKey = localStorage.getItem(API_KEY_VAULT);
+            if (!apiKey) { alert("APIキーがありません。"); return; }
+            if (chatLogArray.length < 2) { alert("凍結する歴史が少なすぎます。"); return; }
+            
+            this.innerText = "凍結処理中...";
+            this.disabled = true;
 
             var sendLogs = chatLogArray.slice();
             while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
-            if (sendLogs.length === 0) return null;
-
-            // 1. 全ペイロードの構築
+            
             var allContents = [];
             sendLogs.forEach(function(log) {
                 var role = log.sender === "船長" ? "user" : "model";
@@ -421,9 +455,7 @@
                 }
             });
             if (allContents.length > 0 && allContents[allContents.length - 1].role !== "user") { allContents.pop(); }
-            if (allContents.length === 0) return null;
-
-            // 2. システムプロンプト（セーブドインフォメーション）の構築
+            
             var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
             var savedInfo = localStorage.getItem("gemini_saved_info") || "";
             var finalInstruction = sysPrompt;
@@ -432,52 +464,92 @@
             
             var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
-            // 3. 【明示的キャッシュの構築判定】
-            let cacheTargetLength = allContents.length - 1;
-            let now = Date.now();
+            let cacheBody = {
+                model: "models/gemini-3.6-flash",
+                contents: allContents,
+                systemInstruction: sysInstObj,
+                ttl: "3600s"
+            };
 
-            if (cacheTargetLength > 4 && (!activeCacheName || activeCacheExpiry < now || activeCacheLength < cacheTargetLength - 4)) {
-                let cacheContents = allContents.slice(0, cacheTargetLength);
-                let cacheBody = {
-                    model: "models/gemini-3.6-flash",
-                    contents: cacheContents,
-                    systemInstruction: sysInstObj,
-                    ttl: "3600s"
-                };
+            try {
+                let cacheRes = await fetch("https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" + apiKey, {
+                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
+                });
+                let cacheData = await cacheRes.json();
                 
-                try {
-                    let cacheRes = await fetch("https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" + apiKey, {
-                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
-                    });
-                    let cacheData = await cacheRes.json();
-                    
-                    if (cacheData.name) {
-                        activeCacheName = cacheData.name;
-                        activeCacheLength = cacheTargetLength;
-                        activeCacheExpiry = new Date(cacheData.expireTime).getTime() - 60000;
-                        console.log("【システム】明示的キャッシュを生成しました: " + activeCacheName);
-                    } else if (cacheData.error && cacheData.error.code === 400 && cacheData.error.message.includes("minimum")) {
-                        console.log("【システム】トークン数が閾値（約32k）未満のため、通常通信を行います。");
-                        activeCacheName = null;
+                if (cacheData.name) {
+                    activeCacheName = cacheData.name;
+                    activeCacheLength = allContents.length;
+                    activeCacheExpiry = new Date(cacheData.expireTime).getTime();
+                    alert("歴史の凍結が完了しました。\n（ここからの通信は大幅な割引が適用されます）");
+                } else if (cacheData.error) {
+                    if (cacheData.error.message.includes("minimum")) {
+                        alert("エラー：歴史の量がAPIの凍結基準（約32,768トークン）に達していません。\nもっと対話を重ねてから実行してください。");
+                    } else {
+                        alert("APIエラー: " + cacheData.error.message);
                     }
-                } catch (e) { 
-                    console.error("キャッシュ生成エラー", e); 
-                    activeCacheName = null; 
                 }
+            } catch (e) {
+                alert("キャッシュサーバーとの通信に失敗しました。");
             }
+            this.innerText = "現在の歴史を凍結 (1時間)";
+            this.disabled = false;
+            updateCacheUI();
+        };
 
-            // 4. 生成リクエストの組み立て
+        // 【新設】手動による明示的キャッシュ破棄イベント
+        document.getElementById("clear-cache-btn").onclick = function() {
+            activeCacheName = null;
+            updateCacheUI();
+        };
+
+        // ========================================================
+        // 【換装済】手動キャッシュ対応 & オートヒール搭載のAPI通信部
+        // ========================================================
+        async function fetchGeminiAPI(isAutoRetry = false) {
+            var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
+
+            var sendLogs = chatLogArray.slice();
+            while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
+            if (sendLogs.length === 0) return null;
+
+            var allContents = [];
+            sendLogs.forEach(function(log) {
+                var role = log.sender === "船長" ? "user" : "model";
+                var timeStr = log.time ? "【" + log.time + "】\n" : "";
+                var currentText = timeStr + log.text;
+                var lastContent = allContents[allContents.length - 1];
+                if (lastContent && lastContent.role === role) { 
+                    lastContent.parts[0].text += "\n\n" + currentText; 
+                } else { 
+                    allContents.push({ role: role, parts: [{ text: currentText }] }); 
+                }
+            });
+            if (allContents.length > 0 && allContents[allContents.length - 1].role !== "user") { allContents.pop(); }
+
             var requestBody = { 
                 tools: [{ googleSearch: {} }], 
                 generationConfig: { temperature: parseFloat(document.getElementById("temp-slider").value) } 
             };
 
-            if (activeCacheName) {
+            // キャッシュの有効性判定とペイロードの切り替え
+            if (activeCacheName && activeCacheExpiry > Date.now() && allContents.length >= activeCacheLength) {
                 requestBody.cachedContent = activeCacheName;
+                // 凍結した部分以降の「差分ログ」だけを送信する
                 requestBody.contents = allContents.slice(activeCacheLength);
             } else {
+                // キャッシュが無効・期限切れ、またはログが改ざん（削除）されて短くなった場合はフル送信
+                activeCacheName = null;
+                updateCacheUI();
+                
                 requestBody.contents = allContents;
-                if (sysInstObj) requestBody.systemInstruction = sysInstObj;
+                
+                var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
+                var savedInfo = localStorage.getItem("gemini_saved_info") || "";
+                var finalInstruction = sysPrompt;
+                if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
+                finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
+                if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
             }
 
             var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
@@ -486,7 +558,18 @@
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
                 var data = await response.json();
                 
-                if (data.error) { alert("APIからの拒否理由: " + data.error.message); return null; }
+                // 【オートヒール機構】APIによる理不尽なキャッシュサイレント破棄を検知し、自律的に再送する
+                if (data.error) {
+                    if (activeCacheName && !isAutoRetry && (data.error.message.includes("unavailable") || data.error.message.includes("cache") || data.error.message.includes("not found"))) {
+                        console.warn("【システム監視】サーバー側のキャッシュ消失を検知。フル送信で自律リトライを実行します。");
+                        activeCacheName = null;
+                        updateCacheUI();
+                        return await fetchGeminiAPI(true); // フラグを立てて無限ループを防ぎつつ再送
+                    }
+                    alert("APIからの拒否理由: " + data.error.message); 
+                    return null; 
+                }
+
                 if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") { return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？"; }
                 if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) { alert("異常データ受信: " + JSON.stringify(data).substring(0, 300)); return null; }            
 
@@ -532,6 +615,10 @@
 
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
+            
+            // UIの定期更新タイマー（キャッシュ残り時間のカウントダウン等）
+            setInterval(updateCacheUI, 60000);
+            updateCacheUI();
         };
 
         document.getElementById("copy-checked-btn").onclick = function() {
@@ -628,7 +715,6 @@
                 sendBtn.disabled = true; sendBtn.innerText = "通信中..."; 
                 chatLogArray.push({ sender: "船長", time: getFormattedTime(), text: text }); enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
                 
-                // 【改修③】入力欄の残骸を消去するためのハック
                 inputArea.value = ""; inputArea.style.height = 'auto';
                 setTimeout(() => { inputArea.value = ""; }, 10);
 
