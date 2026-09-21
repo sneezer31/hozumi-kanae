@@ -458,7 +458,7 @@
             var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
             let cacheBody = {
-                model: "models/gemini-3.6-flash",
+                model: "models/gemini-3.1-pro-preview",
                 contents: allContents,
                 tools: [{ googleSearch: {} }],
                 systemInstruction: sysInstObj,
@@ -540,7 +540,7 @@
                 if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
             }
 
-            var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
+            var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=" + apiKey;
 
             try {
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
