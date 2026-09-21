@@ -480,7 +480,7 @@
                     if (cacheData.error.message.includes("minimum")) {
                         alert("エラー：歴史の量がAPIの凍結基準（約32,768トークン）に達していません。\nもっと対話を重ねてから実行してください。");
                     } else {
-                        alert("APIエラー: " + cacheData.error.message);
+                        alert("APIエラー（キャッシュ非対応の可能性があります）: " + cacheData.error.message);
                     }
                 }
             } catch (e) {
