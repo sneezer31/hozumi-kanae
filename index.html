@@ -19,13 +19,11 @@
         header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
         header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: flex-end; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
         
-        /* ログ表示領域（コピペしやすく明示的にテキスト選択を許可） */
         #log-window { flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; -webkit-user-select: text; user-select: text; }
         .log-user, .log-ai { font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif; font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px; -webkit-user-select: text; user-select: text; }
         .log-meta { font-size: 12px; color: #737373; margin-bottom: 5px; font-family: sans-serif; display: flex; align-items: center; gap: 5px; -webkit-user-select: none; user-select: none; }
         .log-checkbox { width: 14px; height: 14px; cursor: pointer; }
         
-        /* 入力領域 */
         #input-window { min-height: 70px; flex: none; padding: 10px; background-color: #ecf0f1; display: flex; flex-direction: column; border-top: 1px solid #bdc3c7; }
         textarea#main-input { flex-grow: 1; resize: none; padding: 10px; font-size: 16px; border: 1px solid #95a5a6; border-radius: 5px; color: #595959; outline: none; transition: border-color 0.2s, box-shadow 0.2s; overflow-y: hidden; line-height: 1.5; }
         textarea#main-input:focus { border-color: #2e648c; box-shadow: 0 0 0 2px rgba(46, 100, 140, 0.2); }
@@ -97,7 +95,6 @@
     
     <!-- 左サイドバー -->
     <div id="sidebar-console">
-        <!-- 【追加】明示的キャッシュの手動操作パネル -->
         <div class="console-section">
             <div class="console-title">通信コスト統制（キャッシュ）</div>
             <div style="font-size: 12px; color: #bdc3c7; margin-bottom: 5px; font-family: monospace;" id="cache-status-text">状態: 未凍結（フル送信）</div>
@@ -142,7 +139,7 @@
         </div>
     </div>
 
-    <!-- 右サイドバー（SPA仕様） -->
+    <!-- 右サイドバー -->
     <div id="right-sidebar">
         <div id="rs-view-main">
             <div class="console-section" style="flex: 1;">
@@ -253,7 +250,6 @@
         var sessionWaltzCount = 0;
         var timeHistory = []; 
 
-        // 【新設】手動明示的キャッシュ管理用の状態変数
         var activeCacheName = null;
         var activeCacheLength = 0;
         var activeCacheExpiry = 0;
@@ -407,9 +403,6 @@
             container.innerHTML = html;
         }
 
-        // ========================================================
-        // 【新設】手動キャッシュ管理UIの更新機構
-        // ========================================================
         function updateCacheUI() {
             var statusText = document.getElementById("cache-status-text");
             var createBtn = document.getElementById("create-cache-btn");
@@ -430,7 +423,6 @@
             }
         }
 
-        // 【新設】手動による明示的キャッシュ生成イベント
         document.getElementById("create-cache-btn").onclick = async function() {
             var apiKey = localStorage.getItem(API_KEY_VAULT);
             if (!apiKey) { alert("APIキーがありません。"); return; }
@@ -467,6 +459,7 @@
             let cacheBody = {
                 model: "models/gemini-3.6-flash",
                 contents: allContents,
+                tools: [{ googleSearch: {} }],
                 systemInstruction: sysInstObj,
                 ttl: "3600s"
             };
@@ -497,15 +490,11 @@
             updateCacheUI();
         };
 
-        // 【新設】手動による明示的キャッシュ破棄イベント
         document.getElementById("clear-cache-btn").onclick = function() {
             activeCacheName = null;
             updateCacheUI();
         };
 
-        // ========================================================
-        // 【換装済】手動キャッシュ対応 & オートヒール搭載のAPI通信部
-        // ========================================================
         async function fetchGeminiAPI(isAutoRetry = false) {
             var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
 
@@ -532,16 +521,12 @@
                 generationConfig: { temperature: parseFloat(document.getElementById("temp-slider").value) } 
             };
 
-            // キャッシュの有効性判定とペイロードの切り替え
             if (activeCacheName && activeCacheExpiry > Date.now() && allContents.length >= activeCacheLength) {
                 requestBody.cachedContent = activeCacheName;
-                // 凍結した部分以降の「差分ログ」だけを送信する
                 requestBody.contents = allContents.slice(activeCacheLength);
             } else {
-                // キャッシュが無効・期限切れ、またはログが改ざん（削除）されて短くなった場合はフル送信
                 activeCacheName = null;
                 updateCacheUI();
-                
                 requestBody.contents = allContents;
                 
                 var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
@@ -558,16 +543,12 @@
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
                 var data = await response.json();
                 
-                // 【オートヒール機構】APIによる理不尽なキャッシュサイレント破棄を検知し、自律的に再送する
                 if (data.error) {
                     if (activeCacheName && !isAutoRetry && (data.error.message.includes("unavailable") || data.error.message.includes("cache") || data.error.message.includes("not found"))) {
                         console.warn("【システム監視】サーバー側のキャッシュ消失を検知。フル送信で自律リトライを実行します。");
-                        activeCacheName = null;
-                        updateCacheUI();
-                        return await fetchGeminiAPI(true); // フラグを立てて無限ループを防ぎつつ再送
+                        activeCacheName = null; updateCacheUI(); return await fetchGeminiAPI(true);
                     }
-                    alert("APIからの拒否理由: " + data.error.message); 
-                    return null; 
+                    alert("APIからの拒否理由: " + data.error.message); return null; 
                 }
 
                 if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") { return "【システム割り込み】検索ツールを実行しようとしましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？"; }
@@ -580,6 +561,7 @@
                     }
                     return data.candidates[0].content.parts[0].text;
                 } else { return null; }
+                
             } catch (error) { alert("通信沈黙：サーバーへの接続に失敗しました。"); return null; }
         }
 
@@ -616,9 +598,7 @@
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
             
-            // UIの定期更新タイマー（キャッシュ残り時間のカウントダウン等）
-            setInterval(updateCacheUI, 60000);
-            updateCacheUI();
+            setInterval(updateCacheUI, 60000); updateCacheUI();
         };
 
         document.getElementById("copy-checked-btn").onclick = function() {
