@@ -426,7 +426,7 @@
             if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
 
             requestBody.generationConfig = { temperature: parseFloat(document.getElementById("temp-slider").value) };
-            var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
+            var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
 
             try {
                 var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
