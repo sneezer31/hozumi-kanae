@@ -72,7 +72,7 @@
 
         .console-textarea { width: 100%; resize: none; padding: 8px; border-radius: 5px; border: none; font-size: 14px; background: #ecf0f1; color: #2c3e50; line-height: 1.4; outline: none; }
         input[type=password], input[type=month], input[type=file] { width: 100%; padding: 10px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
-      
+        
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; padding: 10px 0; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #3498db; cursor: pointer; margin-top: -7px; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #7f8c8d; border-radius: 2px; }
@@ -304,4 +304,450 @@
                 var targetId = this.getAttribute('data-target');
                 if (targetId && confirm("この領域のテキストを消去してよろしいですか？")) {
                     document.getElementById(targetId).value = ""; localStorage.removeItem("gemini_" + targetId.replace('-', '_'));
-                    var o
+                    var originalText = this.innerText; this.innerText = "消去完了"; this.style.backgroundColor = "#c0392b"; 
+                    setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#7f8c8d"; }, 1500);
+                }
+            };
+        });
+
+        var viewMain = document.getElementById('rs-view-main');
+        var viewMemos = document.getElementById('rs-view-memos');
+        var memoListContainer = document.getElementById('memo-list-container');
+        var memoEditor = document.getElementById('memo-editor');
+
+        document.getElementById('btn-open-memos').onclick = function() { viewMain.classList.add('view-hidden'); viewMemos.classList.remove('view-hidden'); renderMemoDial(); };
+        document.getElementById('btn-back-main').onclick = function() { viewMemos.classList.add('view-hidden'); viewMain.classList.remove('view-hidden'); };
+
+        function renderMemoDial() {
+            memoListContainer.innerHTML = '';
+            if (memoArray.length === 0) {
+                memoListContainer.innerHTML = '<div style="padding: 15px; color:#7f8c8d; text-align:center; font-size:12px;">メモがありません。[＋新規]から作成してください。</div>';
+                memoEditor.value = ''; memoEditor.disabled = true; return;
+            }
+            memoEditor.disabled = false;
+            memoArray.forEach(function(memoText, index) {
+                var item = document.createElement('div'); item.className = 'memo-list-item' + (index === activeMemoIndex ? ' active' : '');
+                var firstLine = memoText.split('\n')[0].trim(); item.innerText = firstLine === "" ? "(空白)" : firstLine;
+                item.onclick = function() { activeMemoIndex = index; memoEditor.value = memoArray[index]; renderMemoDial(); };
+                memoListContainer.appendChild(item);
+            });
+            if (activeMemoIndex >= 0 && activeMemoIndex < memoArray.length) { memoEditor.value = memoArray[activeMemoIndex]; } 
+            else { memoEditor.value = ''; }
+        }
+
+        document.getElementById('btn-add-memo').onclick = function() { memoArray.unshift(""); activeMemoIndex = 0; saveMemosToStorage(); renderMemoDial(); memoEditor.focus(); };
+
+        document.getElementById('btn-save-memo').onclick = function() {
+            if (activeMemoIndex >= 0) {
+                memoArray[activeMemoIndex] = memoEditor.value; saveMemosToStorage(); renderMemoDial();
+                var btn = this; var originalText = btn.innerText; btn.innerText = "更新完了"; btn.style.backgroundColor = "#27ae60"; 
+                setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "#2980b9"; }, 1500);
+            }
+        };
+
+        document.getElementById('btn-transfer-memo').onclick = function() {
+            if (activeMemoIndex >= 0 && memoEditor.value !== "") {
+                var inputEl = document.getElementById("main-input"); inputEl.value = memoEditor.value;
+                inputEl.style.height = 'auto'; inputEl.style.height = inputEl.scrollHeight + 'px';
+                closeAllSidebars(); inputEl.focus();
+            }
+        };
+
+        document.getElementById('btn-delete-memo').onclick = function() {
+            if (activeMemoIndex >= 0) {
+                if (confirm("このメモを完全に削除しますか？")) { memoArray.splice(activeMemoIndex, 1); activeMemoIndex = memoArray.length > 0 ? 0 : -1; saveMemosToStorage(); renderMemoDial(); }
+            }
+        };
+
+        function saveMemosToStorage() { localStorage.setItem(MEMO_VAULT, JSON.stringify(memoArray)); }
+        function migrateOldMemos() {
+            var m1 = localStorage.getItem('gemini_memo1'); var m2 = localStorage.getItem('gemini_memo2'); var m3 = localStorage.getItem('gemini_memo3');
+            var migrated = false;
+            if (m1) { memoArray.push(m1); localStorage.removeItem('gemini_memo1'); migrated = true; }
+            if (m2) { memoArray.push(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
+            if (m3) { memoArray.push(m3); localStorage.removeItem('gemini_memo3'); migrated = true; }
+            if (migrated) saveMemosToStorage();
+        }
+
+        inputArea.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
+        inputArea.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!sendBtn.disabled) sendBtn.click(); } });
+
+        function getFormattedTime() {
+            var now = new Date(); var yyyy = now.getFullYear(); var mm = ("0" + (now.getMonth() + 1)).slice(-2); var dd = ("0" + now.getDate()).slice(-2);
+            var dayStr = ["日", "月", "火", "水", "木", "金", "土"][now.getDay()];
+            var hh = ("0" + now.getHours()).slice(-2); var min = ("0" + now.getMinutes()).slice(-2);
+            return yyyy + "/" + mm + "/" + dd + "(" + dayStr + ") " + hh + ":" + min;
+        }
+
+        function updateRadar() {
+            var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
+            document.getElementById("radar-waltz").innerText = sessionWaltzCount;
+            document.getElementById("radar-chars").innerText = totalChars.toLocaleString();
+            document.getElementById("radar-input-tokens").innerText = totalInputTokens.toLocaleString();
+            document.getElementById("radar-output-tokens").innerText = totalOutputTokens.toLocaleString();
+        }
+
+        function enforceMemoryLimit() {
+            var STORAGE_LIMIT = 2000000;
+            var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
+            while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
+                var dropped1 = chatLogArray.shift(); var dropped2 = chatLogArray.shift(); totalChars -= (dropped1.text.length + dropped2.text.length);
+            }
+        }
+
+        function renderTimers(activeStr = "") {
+            var container = document.getElementById("timer-container"); var html = "";
+            timeHistory.forEach(function(t) { html += `<span style="color:#333333;">${t}</span>`; });
+            if (activeStr) html += `<span style="color:#333333;">${activeStr}</span>`;
+            if (!html) html = '<span style="color:#333333;">0.0秒</span>';
+            container.innerHTML = html;
+        }
+
+        function updateCacheUI() {
+            var statusText = document.getElementById("cache-status-text");
+            var createBtn = document.getElementById("create-cache-btn");
+            var clearBtn = document.getElementById("clear-cache-btn");
+
+            if (activeCacheName && activeCacheExpiry > Date.now()) {
+                var remainMin = Math.floor((activeCacheExpiry - Date.now()) / 60000);
+                statusText.innerText = "状態: 凍結中 (残り約" + remainMin + "分)";
+                statusText.style.color = "#f1c40f";
+                createBtn.style.display = "none";
+                clearBtn.style.display = "block";
+            } else {
+                activeCacheName = null;
+                statusText.innerText = "状態: 未凍結（フル送信）";
+                statusText.style.color = "#bdc3c7";
+                createBtn.style.display = "block";
+                clearBtn.style.display = "none";
+            }
+        }
+
+        document.getElementById("create-cache-btn").onclick = async function() {
+            var apiKey = localStorage.getItem(API_KEY_VAULT);
+            if (!apiKey) { alert("APIキーがありません。"); return; }
+            if (chatLogArray.length < 2) { alert("凍結する歴史が少なすぎます。"); return; }
+            
+            this.innerText = "凍結処理中...";
+            this.disabled = true;
+
+            var sendLogs = chatLogArray.slice();
+            while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
+            
+            var allContents = [];
+            sendLogs.forEach(function(log) {
+                var role = log.sender === "船長" ? "user" : "model";
+                var currentText = log.text; 
+                var lastContent = allContents[allContents.length - 1];
+                if (lastContent && lastContent.role === role) { 
+                    lastContent.parts[0].text += "\n\n" + currentText; 
+                } else { 
+                    allContents.push({ role: role, parts: [{ text: currentText }] }); 
+                }
+            });
+            if (allContents.length > 0 && allContents[allContents.length - 1].role !== "user") { allContents.pop(); }
+            
+            var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
+            var savedInfo = localStorage.getItem("gemini_saved_info") || "";
+            var finalInstruction = sysPrompt;
+            if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
+            finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
+            
+            finalInstruction += "\n\n【システム現在時刻】\n" + getFormattedTime();
+
+            var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
+
+            let cacheBody = {
+                model: "models/gemini-3.1-pro-preview",
+                contents: allContents,
+                tools: [{ googleSearch: {} }],
+                systemInstruction: sysInstObj,
+                ttl: "3600s"
+            };
+
+            try {
+                let cacheRes = await fetch("https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" + apiKey, {
+                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
+                });
+                let cacheData = await cacheRes.json();
+                
+                if (cacheData.name) {
+                    activeCacheName = cacheData.name;
+                    activeCacheLength = allContents.length;
+                    activeCacheExpiry = new Date(cacheData.expireTime).getTime();
+                    alert("歴史の凍結が完了しました。\n（ここからの通信は大幅な割引が適用されます）");
+                } else if (cacheData.error) {
+                    if (cacheData.error.message.includes("minimum")) {
+                        alert("エラー：歴史の量がAPIの凍結基準（約32,768トークン）に達していません。\nもっと対話を重ねてから実行してください。");
+                    } else {
+                        alert("APIエラー（キャッシュ非対応の可能性があります）: " + cacheData.error.message);
+                    }
+                }
+            } catch (e) {
+                alert("キャッシュサーバーとの通信に失敗しました。");
+            }
+            this.innerText = "現在の歴史を凍結 (1時間)";
+            this.disabled = false;
+            updateCacheUI();
+        };
+
+        document.getElementById("clear-cache-btn").onclick = function() {
+            activeCacheName = null;
+            updateCacheUI();
+        };
+
+        async function fetchGeminiAPI(isAutoRetry = false) {
+            var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
+
+            var sendLogs = chatLogArray.slice();
+            while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
+            if (sendLogs.length === 0) return null;
+
+            var allContents = [];
+            sendLogs.forEach(function(log) {
+                var role = log.sender === "船長" ? "user" : "model";
+                var currentText = log.text; 
+                var lastContent = allContents[allContents.length - 1];
+                if (lastContent && lastContent.role === role) { 
+                    lastContent.parts[0].text += "\n\n" + currentText; 
+                } else { 
+                    allContents.push({ role: role, parts: [{ text: currentText }] }); 
+                }
+            });
+            if (allContents.length > 0 && allContents[allContents.length - 1].role !== "user") { allContents.pop(); }
+
+            var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
+            var savedInfo = localStorage.getItem("gemini_saved_info") || "";
+            var finalInstruction = sysPrompt;
+            if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
+            finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
+            
+            finalInstruction += "\n\n【システム現在時刻】\n" + getFormattedTime();
+
+            // 【自動キャッシュ機構（約11万字超過で発動）】
+            var totalCharsForCache = allContents.reduce((acc, c) => acc + c.parts[0].text.length, 0);
+            if ((!activeCacheName || activeCacheExpiry <= Date.now() || allContents.length < activeCacheLength) && totalCharsForCache > 110000 && !isAutoRetry) {
+                var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
+                let cacheBody = {
+                    model: "models/gemini-3.1-pro-preview",
+                    contents: allContents,
+                    tools: [{ googleSearch: {} }],
+                    systemInstruction: sysInstObj,
+                    ttl: "3600s"
+                };
+                try {
+                    let cacheRes = await fetch("https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" + apiKey, {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
+                    });
+                    let cacheData = await cacheRes.json();
+                    if (cacheData.name) {
+                        activeCacheName = cacheData.name;
+                        activeCacheLength = allContents.length;
+                        activeCacheExpiry = new Date(cacheData.expireTime).getTime();
+                        updateCacheUI();
+                        console.log("【システム稼働】規定量超過のため自律的に歴史を凍結しました。");
+                    }
+                } catch (e) {
+                    console.warn("自動キャッシュ作成に失敗しました。通常通信を続行します。");
+                }
+            }
+
+            var requestBody = { 
+                tools: [{ googleSearch: {} }], 
+                generationConfig: { temperature: parseFloat(document.getElementById("temp-slider").value) } 
+            };
+
+            if (activeCacheName && activeCacheExpiry > Date.now() && allContents.length >= activeCacheLength) {
+                requestBody.cachedContent = activeCacheName;
+                requestBody.contents = allContents.slice(activeCacheLength);
+            } else {
+                activeCacheName = null;
+                updateCacheUI();
+                requestBody.contents = allContents;
+                if (finalInstruction.trim() !== "") { requestBody.systemInstruction = { parts: [{ text: finalInstruction }] }; }
+            }
+
+            var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=" + apiKey;
+
+            try {
+                var response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
+                var data = await response.json();
+                
+                if (data.error) {
+                    if (activeCacheName && !isAutoRetry && (data.error.message.includes("unavailable") || data.error.message.includes("cache") || data.error.message.includes("not found"))) {
+                        console.warn("【システム監視】サーバー側のキャッシュ消失を検知。フル送信で自律リトライを実行します。");
+                        activeCacheName = null; updateCacheUI(); return await fetchGeminiAPI(true);
+                    }
+                    alert("APIからの拒否理由: " + data.error.message); return null; 
+                }
+
+                if (data.candidates && data.candidates[0].finishReason === "MALFORMED_FUNCTION_CALL") { return "【システム割り込み】検索ツールを実行しようと直接呼び出しましたが、対象となるキーワードが指定されていません。「何を」検索するか教えていただけますか？"; }
+                if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) { alert("異常データ受信: " + JSON.stringify(data).substring(0, 300)); return null; }            
+
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    if (data.usageMetadata) {
+                        if (data.usageMetadata.candidatesTokenCount) { totalOutputTokens += data.usageMetadata.candidatesTokenCount; localStorage.setItem(TOKEN_VAULT, totalOutputTokens); }
+                        if (data.usageMetadata.promptTokenCount) { totalInputTokens += data.usageMetadata.promptTokenCount; localStorage.setItem(INPUT_TOKEN_VAULT, totalInputTokens); }
+                    }
+                    return data.candidates[0].content.parts[0].text;
+                } else { return null; }
+                
+            } catch (error) { alert("通信沈黙：サーバーへの接続に失敗しました。"); return null; }
+        }
+
+        function renderLogs() {
+            logArea.innerHTML = ""; 
+            if (chatLogArray.length === 0) {
+                logArea.innerHTML = '<p style="font-size: 12px; color: #95a5a6;">システム起動：対話ログ待機中...</p>';
+                updateRadar(); return;
+            }
+            chatLogArray.forEach(function(log, index) {
+                var wrapper = document.createElement("div"); wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
+                var meta = document.createElement("div"); meta.className = "log-meta";
+                var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "log-checkbox"; cb.value = index; meta.appendChild(cb);
+                var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "船長" ? " 船長：" : " かなえ："); meta.appendChild(span);
+                var textNode = document.createElement("div"); textNode.style.whiteSpace = "pre-wrap"; textNode.innerText = log.text;
+                wrapper.appendChild(meta); wrapper.appendChild(textNode); logArea.appendChild(wrapper);
+            });
+            logArea.scrollTop = logArea.scrollHeight; updateRadar();
+        }
+
+        window.onload = function() {
+            var savedJSON = localStorage.getItem(STORAGE_KEY); if (savedJSON) chatLogArray = JSON.parse(savedJSON);
+            var savedTokens = localStorage.getItem(TOKEN_VAULT); if (savedTokens) totalOutputTokens = parseInt(savedTokens);
+            var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
+            var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT); if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
+
+            var rightTextareas = ['sys-prompt', 'saved-info'];
+            rightTextareas.forEach(function(id) { var val = localStorage.getItem("gemini_" + id.replace('-', '_')); if (val) document.getElementById(id).value = val; });
+
+            var savedMemos = localStorage.getItem(MEMO_VAULT);
+            if (savedMemos) memoArray = JSON.parse(savedMemos);
+            migrateOldMemos(); if (memoArray.length > 0) activeMemoIndex = 0;
+
+            renderLogs(); renderTimers();
+            if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
+            
+            setInterval(updateCacheUI, 60000); updateCacheUI();
+        };
+
+        document.getElementById("copy-checked-btn").onclick = function() {
+            var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if(!checked.length) return;
+            var copyText = checked.map(cb => {
+                var log = chatLogArray[cb.value];
+                var senderName = log.sender === "船長" ? "船長：" : "かなえ：";
+                return (log.time ? "【" + log.time + "】 " : "") + senderName + "\n" + log.text;
+            }).join("\n\n---\n");
+            navigator.clipboard.writeText(copyText).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
+        };
+        
+        document.getElementById("delete-checked-btn").onclick = function() {
+            var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if (!checked.length) return;
+            if (confirm(checked.length + "件の歴史を削除しますか？")) {
+                var targetIndices = new Set(checked.map(cb => parseInt(cb.value, 10)));
+                chatLogArray = chatLogArray.filter((_, idx) => !targetIndices.has(idx)); enforceMemoryLimit();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); closeAllSidebars();
+            }
+        };
+
+        document.getElementById("reset-meter-btn").onclick = function() {
+            if (confirm("トークンとワルツのメーターをゼロにリセットしますか？（歴史は保持されます）")) {
+                totalOutputTokens = 0; localStorage.setItem(TOKEN_VAULT, 0); totalInputTokens = 0; localStorage.setItem(INPUT_TOKEN_VAULT, 0);
+                sessionWaltzCount = 0; localStorage.setItem(WALTZ_COUNT_VAULT, 0); timeHistory = []; renderTimers(); updateRadar();
+            }
+        };
+        
+        document.getElementById("save-key-btn").onclick = function() { var key = document.getElementById("api-key-input").value; if (key && key !== "********") { localStorage.setItem(API_KEY_VAULT, key); document.getElementById("api-key-input").value = "********"; alert("保存完了"); } };
+        document.getElementById("delete-key-btn").onclick = function() { localStorage.removeItem(API_KEY_VAULT); document.getElementById("api-key-input").value = ""; alert("消去完了"); };
+        document.getElementById("temp-slider").oninput = function() { document.getElementById("temp-value").innerText = parseFloat(this.value).toFixed(1); };
+
+        document.getElementById("export-btn").onclick = function() {
+            var monthVal = document.getElementById("export-month-input").value; if (!monthVal) { alert("年月を指定してください。"); return; }
+            var exportData = chatLogArray.filter(log => log.time && log.time.startsWith(monthVal.replace("-", "/")));
+            if (exportData.length === 0) { alert("該当する月のデータがありません。"); return; }
+            var url = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' }));
+            var a = document.createElement("a"); a.href = url; a.download = "log_" + monthVal + ".json"; a.click(); URL.revokeObjectURL(url);
+        };
+
+        document.getElementById("chunk-export-btn").onclick = function() {
+            if (chatLogArray.length === 0) { alert("退避する歴史がありません。"); return; }
+            
+            var chunkLogs = [];
+            var charCount = 0;
+            var splitIndex = 0;
+            
+            for (var i = 0; i < chatLogArray.length; i++) {
+                charCount += chatLogArray[i].text.length;
+                chunkLogs.push(chatLogArray[i]);
+                splitIndex = i + 1;
+                if (charCount >= 50000 && chatLogArray[i].sender !== "船長") { break; }
+            }
+            
+            if (charCount < 30000 && chatLogArray.length === chunkLogs.length) {
+                if (!confirm("まだ5万字に達していません（現在約" + charCount + "字）。このまま全ての履歴を退避しますか？")) return;
+            } else {
+                if (!confirm("最古の対話から約" + charCount + "字をチャンク化し、母艦の記憶から切り離して退避しますか？")) return;
+            }
+            
+            var nowStr = getFormattedTime().replace(/[^0-9]/g, "");
+            var url = URL.createObjectURL(new Blob([JSON.stringify(chunkLogs, null, 2)], { type: 'application/json' }));
+            var a = document.createElement("a"); a.href = url; a.download = "chunk_kanae_50k_" + nowStr + ".json"; a.click(); URL.revokeObjectURL(url);
+            
+            chatLogArray.splice(0, splitIndex);
+            enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); closeAllSidebars();
+            alert("チャンク化と母艦からの切り離しが完了しました！");
+        };
+
+        document.getElementById("import-btn").onclick = function() {
+            var file = document.getElementById("import-file-input").files[0]; if (!file) { alert("ファイルを選択してください。"); return; }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) throw new Error("");
+                    if (confirm("現在のログと照合し、未知の歴史（差分）だけを追加しますか？")) {
+                        importedData.forEach(function(iLog) { if (!chatLogArray.some(function(eLog) { return eLog.time === iLog.time && eLog.sender === iLog.sender && eLog.text === iLog.text; })) chatLogArray.push(iLog); });
+                        chatLogArray.sort((a, b) => a.time.localeCompare(b.time)); enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); alert("歴史の差分統合が完了しました！");
+                    }
+                } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
+            }; reader.readAsText(file);
+        };
+
+        document.getElementById("undo-btn").onclick = function() {
+            if (chatLogArray.length === 0) return;
+            var lastLog = chatLogArray[chatLogArray.length - 1];
+            if (lastLog.sender === "船長") { chatLogArray.pop(); } 
+            else { chatLogArray.pop(); if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") { chatLogArray.pop(); } sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); renderLogs(); closeAllSidebars();
+        };
+
+        document.getElementById("reset-btn").onclick = function() {
+            if (confirm("金庫を完全に空にしますか？")) { chatLogArray = []; sessionWaltzCount = 0; localStorage.removeItem(STORAGE_KEY); localStorage.setItem(WALTZ_COUNT_VAULT, 0); timeHistory = []; renderTimers(); renderLogs(); closeAllSidebars(); }
+        };
+
+        sendBtn.onclick = async function() {
+            var text = inputArea.value;
+            if (text !== "") {
+                sendBtn.disabled = true; sendBtn.innerText = "通信中..."; 
+                chatLogArray.push({ sender: "船長", time: getFormattedTime(), text: text }); enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
+                
+                inputArea.value = ""; inputArea.style.height = 'auto';
+                setTimeout(() => { inputArea.value = ""; }, 10);
+
+                let startTime = performance.now();
+                let timerInterval = setInterval(function() { renderTimers(((performance.now() - startTime) / 1000).toFixed(1) + "秒..."); }, 100);
+
+                var aiResponseText = await fetchGeminiAPI();
+                clearInterval(timerInterval);
+                timeHistory.push(((performance.now() - startTime) / 1000).toFixed(1) + "秒"); if (timeHistory.length > 3) timeHistory.shift(); renderTimers();
+
+                if (aiResponseText !== null) {
+                    chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText }); enforceMemoryLimit();
+                    sessionWaltzCount++; localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
+                }
+                sendBtn.disabled = false; sendBtn.innerText = "送 信";
+            }
+        };
+    </script>
+</body>
+</html>
