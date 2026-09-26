@@ -304,9 +304,12 @@
                 var targetId = this.getAttribute('data-target');
                 if (targetId && confirm("この領域のテキストを消去してよろしいですか？")) {
                     document.getElementById(targetId).value = ""; localStorage.removeItem("gemini_" + targetId.replace('-', '_'));
-                    var originalText = this.innerText; thi
+                    var originalText = this.innerText; this.innerText = "消去完了"; this.style.backgroundColor = "#c0392b"; 
+                    setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#7f8c8d"; }, 1500);
+                }
+            };
+        });
 
-<<<<<<< HEAD
         var viewMain = document.getElementById('rs-view-main');
         var viewMemos = document.getElementById('rs-view-memos');
         var memoListContainer = document.getElementById('memo-list-container');
