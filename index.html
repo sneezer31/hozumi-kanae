@@ -400,10 +400,14 @@
                 statusText.style.color = "#f1c40f";
             } else {
                 activeCacheName = null;
+                localStorage.removeItem("gemini_cache_name");
+                localStorage.removeItem("gemini_cache_length");
+                localStorage.removeItem("gemini_cache_expiry");
                 statusText.innerText = "状態: 未凍結（フル送信）";
                 statusText.style.color = "#bdc3c7";
             }
         }
+
         async function fetchGeminiAPI(isAutoRetry = false) {
             var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
 
@@ -450,15 +454,25 @@
                         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
                     });
                     let cacheData = await cacheRes.json();
-                    if (cacheData.name) {
-                        activeCacheName = cacheData.name;
-                        activeCacheLength = historyForCache.length; // 新しいメッセージを含まない長さを記憶
-                        activeCacheExpiry = new Date(cacheData.expireTime).getTime();
-                        updateCacheUI();
-                        console.log("【システム稼働】自律的に歴史を凍結しました。");
-                    } else {
-                        console.warn("凍結保留: トークン不足等の理由により今回はフル送信を実行します。", cacheData);
-                    }
+                   function updateCacheUI() {
+            var statusText = document.getElementById("cache-status-text");
+
+            if (activeCacheName && activeCacheExpiry > Date.now()) {
+                var remainSec = Math.floor((activeCacheExpiry - Date.now()) / 1000);
+                var m = Math.floor(remainSec / 60);
+                var s = remainSec % 60;
+                statusText.innerText = "状態: 凍結中 (残り " + ("0" + m).slice(-2) + ":" + ("0" + s).slice(-2) + ")";
+                statusText.style.color = "#f1c40f";
+            } else {
+                activeCacheName = null;
+                localStorage.removeItem("gemini_cache_name");
+                localStorage.removeItem("gemini_cache_length");
+                localStorage.removeItem("gemini_cache_expiry");
+                statusText.innerText = "状態: 未凍結（フル送信）";
+                statusText.style.color = "#bdc3c7";
+            }
+        }
+
                 } catch (e) {
                     console.warn("自動キャッシュ作成に通信失敗しました。通常通信を続行します。");
                 }
@@ -528,7 +542,13 @@
             var savedTokens = localStorage.getItem(TOKEN_VAULT); if (savedTokens) totalOutputTokens = parseInt(savedTokens);
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
             var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT); if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
-
+   // キャッシュの鍵の復元
+            var savedCacheName = localStorage.getItem("gemini_cache_name");
+            if (savedCacheName) {
+                activeCacheName = savedCacheName;
+                activeCacheLength = parseInt(localStorage.getItem("gemini_cache_length")) || 0;
+                activeCacheExpiry = parseInt(localStorage.getItem("gemini_cache_expiry")) || 0;
+            }
             var rightTextareas = ['sys-prompt', 'saved-info'];
             rightTextareas.forEach(function(id) { var val = localStorage.getItem("gemini_" + id.replace('-', '_')); if (val) document.getElementById(id).value = val; });
 
