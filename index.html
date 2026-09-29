@@ -454,6 +454,16 @@
                         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cacheBody)
                     });
                     let cacheData = await cacheRes.json();
+                    if (cacheData.name) {
+    activeCacheName = cacheData.name;
+    activeCacheExpiry = Date.now() + 3600000;
+    activeCacheLength = historyForCache.length;
+    localStorage.setItem("gemini_cache_name", activeCacheName);
+    localStorage.setItem("gemini_cache_expiry", activeCacheExpiry);
+    localStorage.setItem("gemini_cache_length", activeCacheLength);
+                    }
+
+                    
                    function updateCacheUI() {
             var statusText = document.getElementById("cache-status-text");
 
