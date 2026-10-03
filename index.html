@@ -94,6 +94,10 @@
         <div class="console-section">
             <div class="console-title">通信コスト統制（キャッシュ）</div>
             <div style="font-size: 14px; font-weight: bold; color: #bdc3c7; margin-bottom: 5px; font-family: monospace;" id="cache-status-text">状態: 未凍結（フル送信）</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #ecf0f1; background: #2c3e50; padding: 6px 10px; border-radius: 4px;">
+                <span>直近ターン判定:</span>
+                <span id="turn-cache-status" style="font-size: 16px; line-height: 1;">⚪</span>
+            </div>
         </div>
 
         <div class="console-section">
@@ -350,7 +354,7 @@
             var m1 = localStorage.getItem('gemini_memo1'); var m2 = localStorage.getItem('gemini_memo2'); var m3 = localStorage.getItem('gemini_memo3');
             var migrated = false;
             if (m1) { memoArray.push(m1); localStorage.removeItem('gemini_memo1'); migrated = true; }
-            if (m2) { memoArraypush(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
+            if (m2) { memoArray.push(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
             if (m3) { memoArray.push(m3); localStorage.removeItem('gemini_memo3'); migrated = true; }
             if (migrated) saveMemosToStorage();
         }
@@ -433,7 +437,6 @@
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
             finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
             
-            
             var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
             // 【完全無条件オートマチックキャッシュ機構】
@@ -454,34 +457,13 @@
                     });
                     let cacheData = await cacheRes.json();
                     if (cacheData.name) {
-    activeCacheName = cacheData.name;
-    activeCacheExpiry = Date.now() + 3600000;
-    activeCacheLength = historyForCache.length;
-    localStorage.setItem("gemini_cache_name", activeCacheName);
-    localStorage.setItem("gemini_cache_expiry", activeCacheExpiry);
-    localStorage.setItem("gemini_cache_length", activeCacheLength);
+                        activeCacheName = cacheData.name;
+                        activeCacheExpiry = Date.now() + 3600000;
+                        activeCacheLength = historyForCache.length;
+                        localStorage.setItem("gemini_cache_name", activeCacheName);
+                        localStorage.setItem("gemini_cache_expiry", activeCacheExpiry);
+                        localStorage.setItem("gemini_cache_length", activeCacheLength);
                     }
-
-                    
-                   function updateCacheUI() {
-            var statusText = document.getElementById("cache-status-text");
-
-            if (activeCacheName && activeCacheExpiry > Date.now()) {
-                var remainSec = Math.floor((activeCacheExpiry - Date.now()) / 1000);
-                var m = Math.floor(remainSec / 60);
-                var s = remainSec % 60;
-                statusText.innerText = "状態: 凍結中 (残り " + ("0" + m).slice(-2) + ":" + ("0" + s).slice(-2) + ")";
-                statusText.style.color = "#f1c40f";
-            } else {
-                activeCacheName = null;
-                localStorage.removeItem("gemini_cache_name");
-                localStorage.removeItem("gemini_cache_length");
-                localStorage.removeItem("gemini_cache_expiry");
-                statusText.innerText = "状態: 未凍結（フル送信）";
-                statusText.style.color = "#bdc3c7";
-            }
-        }
-
                 } catch (e) {
                     console.warn("自動キャッシュ作成に通信失敗しました。通常通信を続行します。");
                 }
@@ -522,6 +504,16 @@
                     if (data.usageMetadata) {
                         if (data.usageMetadata.candidatesTokenCount) { totalOutputTokens += data.usageMetadata.candidatesTokenCount; localStorage.setItem(TOKEN_VAULT, totalOutputTokens); }
                         if (data.usageMetadata.promptTokenCount) { totalInputTokens += data.usageMetadata.promptTokenCount; localStorage.setItem(INPUT_TOKEN_VAULT, totalInputTokens); }
+
+                        var turnCacheHit = data.usageMetadata.cachedContentTokenCount || 0;
+                        var turnStatusEl = document.getElementById("turn-cache-status");
+                        if (turnStatusEl) {
+                            if (turnCacheHit > 0) {
+                                turnStatusEl.innerText = "🟢";
+                            } else {
+                                turnStatusEl.innerText = "🔴";
+                            }
+                        }
                     }
                     return data.candidates[0].content.parts[0].text;
                 } else { return null; }
@@ -551,7 +543,8 @@
             var savedTokens = localStorage.getItem(TOKEN_VAULT); if (savedTokens) totalOutputTokens = parseInt(savedTokens);
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
             var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT); if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
-   // キャッシュの鍵の復元
+            
+            // キャッシュの鍵の復元
             var savedCacheName = localStorage.getItem("gemini_cache_name");
             if (savedCacheName) {
                 activeCacheName = savedCacheName;
