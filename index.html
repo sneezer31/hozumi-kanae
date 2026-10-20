@@ -89,10 +89,26 @@
 
     <div id="sidebar-overlay"></div>
     
-    <!-- 左サイドバー -->
+        <!-- 左サイドバー -->
     <div id="sidebar-console">
+        <!-- ▼追加: 物流ポート -->
+        <div class="console-section" id="post-office-section">
+            <div class="console-title">物流ポート (ファイル送受信)</div>
+            <button type="button" class="btn-small" style="background:#8e44ad; width:100%; margin-bottom:4px;" onclick="document.getElementById('file-post').click()">📤 ファイルをポストに投函</button>
+            <input type="file" id="file-post" hidden onchange="handleFilePost(event)">
+            <div id="post-status" style="font-size: 12px; color:#bdc3c7;">投函待ち...</div>
+            <hr style="border:0; border-top:1px dashed #7f8c8d; margin:12px 0;">
+            <div style="font-size:13px; margin-bottom:6px; color:#ecf0f1; display:flex; justify-content:space-between; align-items:center;">
+                <span>📥 郵便受け</span>
+            </div>
+            <div id="mailbox-container" style="background:#2c3e50; padding:8px; border-radius:4px; min-height:45px; font-size:12px; color:#95a5a6; display:flex; flex-direction:column; gap:4px;">
+                荷物はありません
+            </div>
+        </div>
+        <!-- ▲追加ここまで -->
         <div class="console-section">
             <div class="console-title">通信コスト統制（キャッシュ）</div>
+
             <div style="font-size: 14px; font-weight: bold; color: #bdc3c7; margin-bottom: 5px; font-family: monospace;" id="cache-status-text">状態: 未凍結（フル送信）</div>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #ecf0f1; background: #2c3e50; padding: 6px 10px; border-radius: 4px;">
                 <span>直近ターン判定:</span>
@@ -236,12 +252,22 @@
         var memoArray = [];
         var activeMemoIndex = -1;
         
-        var totalOutputTokens = 0;
+              var totalOutputTokens = 0;
         var totalInputTokens = 0;
         var sessionWaltzCount = 0;
         var timeHistory = []; 
+        
+        // ▼追加: 物流制御用変数と関数群
+        var postedFiles = [];
+        var CODE_EXT = { html: "html", js: "js", javascript: "js", css: "css", json: "json", md: "md", markdown: "md", txt: "txt", py: "py", python: "py" };
+        function extractCodeBlocks(text) { var BT = "`"; var FENCE_OPEN = new RegExp("^" + BT + BT + BT + "([A-Za-z0-9_+-]*)\\s*$"); var FENCE_CLOSE = new RegExp("^" + BT + BT + BT + "\\s*$"); var lines = String(text).split("\n"), blocks = [], cur = null; for (var i = 0; i < lines.length; i++) { var ln = lines[i]; if (cur === null) { var mo = ln.match(FENCE_OPEN); if (mo) cur = { lang: mo[1].toLowerCase(), lines: [], closed: false }; } else if (FENCE_CLOSE.test(ln)) { cur.closed = true; cur.code = cur.lines.join("\n"); blocks.push(cur); cur = null; } else { cur.lines.push(ln); } } if (cur !== null) { cur.code = cur.lines.join("\n"); blocks.push(cur); } return blocks; }
+        function downloadText(name, content) { var url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function() { URL.revokeObjectURL(url); }, 1000); }
+        function handleFilePost(e) { var file = e.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function() { postedFiles.push({ name: file.name, content: String(reader.result) }); document.getElementById("post-status").textContent = postedFiles.length + "件のファイルが投函されています"; document.getElementById("post-status").style.color = "#f1c40f"; e.target.value = ""; }; reader.readAsText(file); }
+        function updateMailbox(aiText) { var blocks = extractCodeBlocks(aiText); var container = document.getElementById("mailbox-container"); container.innerHTML = ""; if (blocks.length === 0) { container.innerHTML = "荷物はありません"; return; } blocks.forEach(function(b, bi) { var codeLines = b.code.split("\n"); var fileName = null; var fm = (codeLines[0] || "").match(/FILE:\s*([^\s>*]+)/); var body = b.code; if (fm) { fileName = fm[1]; body = codeLines.slice(1).join("\n"); } else { fileName = "received_" + getFormattedTime().replace(/[^0-9]/g, "") + "_" + (bi + 1) + "." + (CODE_EXT[b.lang] || "txt"); } var btn = document.createElement("button"); btn.className = "btn-small"; btn.style.cssText = "width:100%; text-align:left; padding:8px; margin-bottom:4px; background:#27ae60; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"; btn.textContent = "📦 " + fileName + " (" + codeLines.length + "行)"; btn.disabled = !b.closed; if (!b.closed) { btn.style.background = "#c0392b"; btn.textContent = "⚠ [破損] " + fileName; } btn.onclick = function() { downloadText(fileName, body); }; container.appendChild(btn); }); }
+        // ▲追加ここまで
 
         var activeCacheName = null;
+
         var activeCacheLength = 0;
         var activeCacheExpiry = 0;
 
@@ -426,12 +452,27 @@
                 var lastContent = allContents[allContents.length - 1];
                 if (lastContent && lastContent.role === role) { 
                     lastContent.parts[0].text += "\n\n" + currentText; 
-                } else { 
+                             } else { 
                     allContents.push({ role: role, parts: [{ text: currentText }] }); 
                 }
             });
 
+            // ▼追加: 投函されたファイルを最新の送信ペイロードに結合
+            if (postedFiles.length > 0 && allContents.length > 0) {
+                var lastIdx = allContents.length - 1;
+                if (allContents[lastIdx].role === "user") {
+                    postedFiles.forEach(function(f) {
+                        allContents[lastIdx].parts[0].text += "\n\n[参照ファイル: " + f.name + "]\n" + f.content;
+                    });
+                }
+                postedFiles = [];
+                document.getElementById("post-status").textContent = "投函待ち...";
+                document.getElementById("post-status").style.color = "#bdc3c7";
+            }
+            // ▲追加ここまで
+
             var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
+
             var savedInfo = localStorage.getItem("gemini_saved_info") || "";
             var finalInstruction = sysPrompt;
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
@@ -672,12 +713,15 @@
                 clearInterval(timerInterval);
                 timeHistory.push(((performance.now() - startTime) / 1000).toFixed(1) + "秒"); if (timeHistory.length > 3) timeHistory.shift(); renderTimers();
 
-                if (aiResponseText !== null) {
+                                if (aiResponseText !== null) {
                     chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText }); enforceMemoryLimit();
                     sessionWaltzCount++; localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
+                    
+                    updateMailbox(aiResponseText); // ←追加: 郵便受けの更新
                 }
                 sendBtn.disabled = false; sendBtn.innerText = "送 信";
+
             }
         };
     </script>
