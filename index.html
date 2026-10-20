@@ -17,7 +17,8 @@
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
         
         header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
-        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: flex-end; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
+        /* ▼変更: ヘッダーを flex-start から space-between にして左端にボタンを置けるようにする */
+        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
         
         #log-window { flex: 1; background-color: #ffffff; padding: 20px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; -webkit-user-select: text; user-select: text; }
         .log-user, .log-ai { font-family: "MS UI Gothic", "Yu Gothic UI", "Meiryo UI", sans-serif; font-size: 16px; line-height: 1.6; padding-bottom: 25px; margin-bottom: 25px; -webkit-user-select: text; user-select: text; }
@@ -83,20 +84,29 @@
         .memo-list-item { padding: 10px 12px; border-bottom: 1px solid #7f8c8d; cursor: pointer; font-size: 13px; color: #bdc3c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .memo-list-item:hover { background-color: #34495e; color: #fff; }
         .memo-list-item.active { background-color: #3498db; color: #fff; font-weight: bold; border-left: 4px solid #f1c40f; padding-left: 8px; }
+        
+        /* ▼追加: エルダ起動ボタン用スタイル */
+        #btn-eruda { background: #34495e; border: 1px solid #bdc3c7; color: #bdc3c7; padding: 2px 8px; font-size: 10px; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="sidebar-overlay"></div>
     
-        <!-- 左サイドバー -->
+    <!-- 左サイドバー -->
     <div id="sidebar-console">
         <!-- ▼追加: 物流ポート -->
         <div class="console-section" id="post-office-section">
             <div class="console-title">物流ポート (ファイル送受信)</div>
             <button type="button" class="btn-small" style="background:#8e44ad; width:100%; margin-bottom:4px;" onclick="document.getElementById('file-post').click()">📤 ファイルをポストに投函</button>
-            <input type="file" id="file-post" hidden onchange="handleFilePost(event)">
-            <div id="post-status" style="font-size: 12px; color:#bdc3c7;">投函待ち...</div>
+            <input type="file" id="file-post" hidden multiple onchange="handleFilePost(event)"> <!-- multiple属性追加 -->
+            
+            <!-- ▼追加: ポストのクリアとステータスを横並びに -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <div id="post-status" style="font-size: 12px; color:#bdc3c7;">投函待ち...</div>
+                <button type="button" id="clear-post-btn" style="background: #7f8c8d; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;" onclick="clearPostedFiles()">クリア</button>
+            </div>
+            
             <hr style="border:0; border-top:1px dashed #7f8c8d; margin:12px 0;">
             <div style="font-size:13px; margin-bottom:6px; color:#ecf0f1; display:flex; justify-content:space-between; align-items:center;">
                 <span>📥 郵便受け</span>
@@ -192,7 +202,9 @@
         </div>
     </div>
 
+    <!-- ▼変更: ヘッダー左端にエルダ起動ボタンを追加 -->
     <header>
+        <button id="btn-eruda" onclick="loadEruda()">Eruda</button>
         <div id="secretary-name">穂積かなえ主席書記官</div>
     </header>
 
@@ -252,7 +264,7 @@
         var memoArray = [];
         var activeMemoIndex = -1;
         
-              var totalOutputTokens = 0;
+        var totalOutputTokens = 0;
         var totalInputTokens = 0;
         var sessionWaltzCount = 0;
         var timeHistory = []; 
@@ -262,12 +274,65 @@
         var CODE_EXT = { html: "html", js: "js", javascript: "js", css: "css", json: "json", md: "md", markdown: "md", txt: "txt", py: "py", python: "py" };
         function extractCodeBlocks(text) { var BT = "`"; var FENCE_OPEN = new RegExp("^" + BT + BT + BT + "([A-Za-z0-9_+-]*)\\s*$"); var FENCE_CLOSE = new RegExp("^" + BT + BT + BT + "\\s*$"); var lines = String(text).split("\n"), blocks = [], cur = null; for (var i = 0; i < lines.length; i++) { var ln = lines[i]; if (cur === null) { var mo = ln.match(FENCE_OPEN); if (mo) cur = { lang: mo[1].toLowerCase(), lines: [], closed: false }; } else if (FENCE_CLOSE.test(ln)) { cur.closed = true; cur.code = cur.lines.join("\n"); blocks.push(cur); cur = null; } else { cur.lines.push(ln); } } if (cur !== null) { cur.code = cur.lines.join("\n"); blocks.push(cur); } return blocks; }
         function downloadText(name, content) { var url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function() { URL.revokeObjectURL(url); }, 1000); }
-        function handleFilePost(e) { var file = e.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function() { postedFiles.push({ name: file.name, content: String(reader.result) }); document.getElementById("post-status").textContent = postedFiles.length + "件のファイルが投函されています"; document.getElementById("post-status").style.color = "#f1c40f"; e.target.value = ""; }; reader.readAsText(file); }
+        
+        // ▼変更: 複数ファイル選択対応
+        function handleFilePost(e) { 
+            var files = e.target.files; 
+            if (!files || files.length === 0) return; 
+            
+            var loadedCount = 0;
+            for(var i = 0; i < files.length; i++) {
+                (function(file) {
+                    var reader = new FileReader(); 
+                    reader.onload = function() { 
+                        postedFiles.push({ name: file.name, content: String(reader.result) }); 
+                        loadedCount++;
+                        if (loadedCount === files.length) {
+                            document.getElementById("post-status").textContent = postedFiles.length + "件のファイルが投函されています"; 
+                            document.getElementById("post-status").style.color = "#f1c40f"; 
+                            e.target.value = ""; 
+                        }
+                    }; 
+                    reader.readAsText(file);
+                })(files[i]);
+            }
+        }
+
+        // ▼追加: ポストのクリア処理
+        function clearPostedFiles() {
+            postedFiles = [];
+            document.getElementById("post-status").textContent = "投函待ち...";
+            document.getElementById("post-status").style.color = "#bdc3c7";
+            document.getElementById("file-post").value = "";
+        }
+
         function updateMailbox(aiText) { var blocks = extractCodeBlocks(aiText); var container = document.getElementById("mailbox-container"); container.innerHTML = ""; if (blocks.length === 0) { container.innerHTML = "荷物はありません"; return; } blocks.forEach(function(b, bi) { var codeLines = b.code.split("\n"); var fileName = null; var fm = (codeLines[0] || "").match(/FILE:\s*([^\s>*]+)/); var body = b.code; if (fm) { fileName = fm[1]; body = codeLines.slice(1).join("\n"); } else { fileName = "received_" + getFormattedTime().replace(/[^0-9]/g, "") + "_" + (bi + 1) + "." + (CODE_EXT[b.lang] || "txt"); } var btn = document.createElement("button"); btn.className = "btn-small"; btn.style.cssText = "width:100%; text-align:left; padding:8px; margin-bottom:4px; background:#27ae60; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"; btn.textContent = "📦 " + fileName + " (" + codeLines.length + "行)"; btn.disabled = !b.closed; if (!b.closed) { btn.style.background = "#c0392b"; btn.textContent = "⚠ [破損] " + fileName; } btn.onclick = function() { downloadText(fileName, body); }; container.appendChild(btn); }); }
-        // ▲追加ここまで
+
+        // ▼追加: エルダ(Eruda)の動的ロード処理
+        function loadEruda() {
+            if (window.eruda) {
+                eruda.show();
+                return;
+            }
+            var btn = document.getElementById('btn-eruda');
+            btn.textContent = "Loading...";
+            var script = document.createElement('script');
+            script.src = "//cdn.jsdelivr.net/npm/eruda";
+            script.onload = function() {
+                eruda.init();
+                eruda.show();
+                btn.textContent = "Eruda (Active)";
+                btn.style.color = "#f1c40f";
+                btn.style.borderColor = "#f1c40f";
+            };
+            script.onerror = function() {
+                btn.textContent = "Error";
+                alert("Erudaの読み込みに失敗しました。");
+            };
+            document.head.appendChild(script);
+        }
 
         var activeCacheName = null;
-
         var activeCacheLength = 0;
         var activeCacheExpiry = 0;
 
@@ -457,7 +522,6 @@
                 }
             });
 
-            // ▼追加: 投函されたファイルを最新の送信ペイロードに結合
             if (postedFiles.length > 0 && allContents.length > 0) {
                 var lastIdx = allContents.length - 1;
                 if (allContents[lastIdx].role === "user") {
@@ -469,7 +533,6 @@
                 document.getElementById("post-status").textContent = "投函待ち...";
                 document.getElementById("post-status").style.color = "#bdc3c7";
             }
-            // ▲追加ここまで
 
             var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
 
@@ -480,8 +543,6 @@
             
             var sysInstObj = finalInstruction.trim() !== "" ? { parts: [{ text: finalInstruction }] } : undefined;
 
-            // 【完全無条件オートマチックキャッシュ機構】
-            // 最新のメッセージを除外した「過去の歴史」だけをキャッシュ対象にする
             var historyForCache = allContents.length > 1 ? allContents.slice(0, -1) : [];
             
             if ((!activeCacheName || activeCacheExpiry <= Date.now() || allContents.length < activeCacheLength) && historyForCache.length > 0 && !isAutoRetry) {
@@ -514,7 +575,6 @@
 
             if (activeCacheName && activeCacheExpiry > Date.now() && allContents.length > activeCacheLength) {
                 requestBody.cachedContent = activeCacheName;
-                // これにより、確実に「空ではない（長さ1以上の）最新のメッセージ配列」が抽出されます
                 requestBody.contents = allContents.slice(activeCacheLength);
             } else {
                 activeCacheName = null;
@@ -585,7 +645,6 @@
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
             var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT); if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
             
-            // キャッシュの鍵の復元
             var savedCacheName = localStorage.getItem("gemini_cache_name");
             if (savedCacheName) {
                 activeCacheName = savedCacheName;
@@ -713,12 +772,12 @@
                 clearInterval(timerInterval);
                 timeHistory.push(((performance.now() - startTime) / 1000).toFixed(1) + "秒"); if (timeHistory.length > 3) timeHistory.shift(); renderTimers();
 
-                                if (aiResponseText !== null) {
+                if (aiResponseText !== null) {
                     chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText }); enforceMemoryLimit();
                     sessionWaltzCount++; localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
                     
-                    updateMailbox(aiResponseText); // ←追加: 郵便受けの更新
+                    updateMailbox(aiResponseText);
                 }
                 sendBtn.disabled = false; sendBtn.innerText = "送 信";
 
