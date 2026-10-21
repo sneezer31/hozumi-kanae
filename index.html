@@ -199,7 +199,7 @@
 
     <header>
         <button id="btn-eruda" onclick="loadEruda()">Eruda</button>
-        <div id="secretary-name">穂積かなえ主席書記官</div>
+        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">版 20261021-1</span></div>
     </header>
 
     <div id="log-window"></div>
@@ -597,31 +597,46 @@
             } catch (error) { alert("通信沈黙：サーバーへの接続に失敗しました。"); return null; }
         }
 
+        // 発言1件ぶんのDOMを作る（全件描画と、1件追加の両方で使う）
+        function buildLogElement(log, index) {
+            var wrapper = document.createElement("div"); wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
+            var meta = document.createElement("div"); meta.className = "log-meta";
+            var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "log-checkbox"; cb.value = index; meta.appendChild(cb);
+            var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "船長" ? " 船長：" : " かなえ："); meta.appendChild(span);
+            var textNode = document.createElement("div"); textNode.style.whiteSpace = "pre-wrap"; textNode.textContent = log.text;
+            
+            // ▼変更: 裏データ(attachedFiles)があれば、画面にはオシャレなクリップマークだけを描画
+            if (log.attachedFiles && log.attachedFiles.length > 0) {
+                var attachDiv = document.createElement("div");
+                attachDiv.style.cssText = "font-size:12px; color:#8e44ad; font-weight:bold; margin-bottom:8px; padding:4px 8px; background:#f4f4f5; border-radius:4px; display:inline-block;";
+                var fileNames = [];
+                log.attachedFiles.forEach(function(f){ fileNames.push(f.name); });
+                attachDiv.textContent = "📎 添付ファイル: " + fileNames.join(", ");
+                textNode.insertBefore(attachDiv, textNode.firstChild);
+            }
+
+            wrapper.appendChild(meta); wrapper.appendChild(textNode);
+            return wrapper;
+        }
+
+        // 全件描画（起動時・削除・Undo・搬入など）。まとめて1回だけDOMに載せる
         function renderLogs() {
             logArea.innerHTML = ""; 
             if (chatLogArray.length === 0) {
-                logArea.innerHTML = '<p style="font-size: 12px; color: #95a5a6;">システム起動：対話ログ待機中...</p>';
+                logArea.innerHTML = '<p class="log-empty" style="font-size: 12px; color: #95a5a6;">システム起動：対話ログ待機中...</p>';
                 updateRadar(); return;
             }
-            chatLogArray.forEach(function(log, index) {
-                var wrapper = document.createElement("div"); wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
-                var meta = document.createElement("div"); meta.className = "log-meta";
-                var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "log-checkbox"; cb.value = index; meta.appendChild(cb);
-                var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "船長" ? " 船長：" : " かなえ："); meta.appendChild(span);
-                var textNode = document.createElement("div"); textNode.style.whiteSpace = "pre-wrap"; textNode.innerText = log.text;
-                
-                // ▼変更: 裏データ(attachedFiles)があれば、画面にはオシャレなクリップマークだけを描画
-                if (log.attachedFiles && log.attachedFiles.length > 0) {
-                    var attachDiv = document.createElement("div");
-                    attachDiv.style.cssText = "font-size:12px; color:#8e44ad; font-weight:bold; margin-bottom:8px; padding:4px 8px; background:#f4f4f5; border-radius:4px; display:inline-block;";
-                    var fileNames = [];
-                    log.attachedFiles.forEach(function(f){ fileNames.push(f.name); });
-                    attachDiv.textContent = "📎 添付ファイル: " + fileNames.join(", ");
-                    textNode.insertBefore(attachDiv, textNode.firstChild);
-                }
+            var frag = document.createDocumentFragment();
+            chatLogArray.forEach(function(log, index) { frag.appendChild(buildLogElement(log, index)); });
+            logArea.appendChild(frag);
+            logArea.scrollTop = logArea.scrollHeight; updateRadar();
+        }
 
-                wrapper.appendChild(meta); wrapper.appendChild(textNode); logArea.appendChild(wrapper);
-            });
+        // 末尾の1件だけを足す（送信時はこちらを使う）
+        function appendLogElement(index) {
+            var empty = logArea.querySelector(".log-empty");
+            if (empty) empty.parentNode.removeChild(empty);
+            logArea.appendChild(buildLogElement(chatLogArray[index], index));
             logArea.scrollTop = logArea.scrollHeight; updateRadar();
         }
 
@@ -748,16 +763,26 @@
 
             if (text !== "" || currentFiles) { // ▼変更: テキストが空でもファイルがあれば送信可能に
                 sendBtn.disabled = true; sendBtn.innerText = "通信中..."; 
+
+                // 重い処理より先に、入力欄を空にして秒数を動かし始める
+                inputArea.value = ""; inputArea.style.height = 'auto';
+                let startTime = performance.now();
+                renderTimers("0.0秒...");
+                let timerInterval = setInterval(function() { renderTimers(((performance.now() - startTime) / 1000).toFixed(1) + "秒..."); }, 100);
+                // 1フレーム譲って、上の変更を画面に描いてから重い処理に入る（rAFが止まる場合に備えて100msで打ち切る）
+                await Promise.race([
+                    new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 0); }); }),
+                    new Promise(function(r) { setTimeout(r, 100); })
+                ]);
                 
-                // ▼変更: chatLogArrayにattachedFilesとして裏データを保存
+                // ▼変更: chatLogArrayにattachedFilesとして裏データを保存（保存は最後に1回）
                 chatLogArray.push({ 
                     sender: "船長", 
                     time: getFormattedTime(), 
                     text: text || "（ファイルのみ送信）", 
                     attachedFiles: currentFiles 
                 }); 
-                
-                enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
+                appendLogElement(chatLogArray.length - 1);
                 
                 // ▼変更: ポストを空にしてUIをリセット
                 if (currentFiles) {
@@ -767,23 +792,25 @@
                     document.getElementById("file-post").value = "";
                 }
 
-                inputArea.value = ""; inputArea.style.height = 'auto';
                 setTimeout(() => { inputArea.value = ""; }, 10);
-
-                let startTime = performance.now();
-                let timerInterval = setInterval(function() { renderTimers(((performance.now() - startTime) / 1000).toFixed(1) + "秒..."); }, 100);
 
                 var aiResponseText = await fetchGeminiAPI();
                 clearInterval(timerInterval);
                 timeHistory.push(((performance.now() - startTime) / 1000).toFixed(1) + "秒"); if (timeHistory.length > 3) timeHistory.shift(); renderTimers();
 
                 if (aiResponseText !== null) {
-                    chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText }); enforceMemoryLimit();
+                    chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText });
                     sessionWaltzCount++; localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs();
-                    
+                    appendLogElement(chatLogArray.length - 1);
                     updateMailbox(aiResponseText);
                 }
+
+                // 保存はここで1回だけ。古い発言が押し出されたときだけ全件を描き直す
+                var lenBefore = chatLogArray.length;
+                enforceMemoryLimit();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
+                if (chatLogArray.length !== lenBefore) renderLogs();
+
                 sendBtn.disabled = false; sendBtn.innerText = "送 信";
             }
         };
