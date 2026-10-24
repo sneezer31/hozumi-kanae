@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>イフリート18号（自律母艦仕様・メモコンソール搭載）</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2c3e50">
@@ -14,7 +14,7 @@
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; width: 100%; max-width: 100vw; overflow: hidden; overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; }
+        html, body { height: 100%; overflow: hidden; }
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
         
         header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
@@ -46,11 +46,11 @@
         #sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 35; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; }
         #sidebar-overlay.open { opacity: 1; visibility: visible; }
         
-        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; visibility: hidden; transition: left 0.3s ease, visibility 0s linear 0.3s; }
-        #sidebar-console.open { left: 0; visibility: visible; transition: left 0.3s ease, visibility 0s; }
+        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
+        #sidebar-console.open { left: 0; }
         
-        #right-sidebar { position: fixed; top: 0; right: 0; transform: translateX(100%); width: 75vw; height: 100dvh; background-color: #34495e; color: white; z-index: 40; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); font-family: sans-serif; overflow-y: hidden; visibility: hidden; transition: transform 0.3s ease, visibility 0s linear 0.3s; }
-        #right-sidebar.open { transform: translateX(0); visibility: visible; transition: transform 0.3s ease, visibility 0s; }
+        #right-sidebar { position: fixed; top: 0; right: -75vw; width: 75vw; height: 100dvh; background-color: #34495e; color: white; transition: right 0.3s ease; z-index: 40; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); font-family: sans-serif; overflow-y: hidden; }
+        #right-sidebar.open { right: 0; }
         
         .console-section { border-bottom: 1px solid #7f8c8d; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .console-section:last-child { border-bottom: none; padding-bottom: 0; }
@@ -194,7 +194,7 @@
 
     <header>
         <button id="btn-eruda" onclick="loadEruda()">Eruda</button>
-        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">Firebaseマスターコンソール 18号 版 20261024-1</span></div>
+        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">Firebaseマスターコンソール 18号 版 20261024-2</span></div>
     </header>
 
     <div id="log-window"></div>
@@ -244,7 +244,7 @@
         }
 
         if (window.visualViewport) {
-            function updateBodyHeight() { document.body.style.height = window.visualViewport.height + "px"; window.scrollTo(0, 0); document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0; }
+            function updateBodyHeight() { document.body.style.height = window.visualViewport.height + "px"; window.scrollTo(0, 0); }
             window.visualViewport.addEventListener("resize", function() {
                 updateBodyHeight(); setTimeout(function() { updateBodyHeight(); document.getElementById("control-area").scrollIntoView(false); }, 400);
             });
@@ -468,7 +468,6 @@
         function handleSwipe() {
             var xDiff = touchStartX - touchEndX;
             var yDiff = Math.abs(touchStartY - touchEndY);
-            window.scrollTo(0, 0); document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0;
             if (yDiff > Math.abs(xDiff)) return; 
             if (xDiff > 50) { if (consolePanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX > window.innerWidth - 100 && !rightPanel.classList.contains("open")) openRightSidebar(); } 
             else if (xDiff < -50) { if (rightPanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX < 100 && !consolePanel.classList.contains("open")) openSidebar(); }
