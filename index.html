@@ -8,10 +8,11 @@
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="icon-192.png">
     
+    <!-- Firebase v9 compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+
     <style>
-        /* ==========================================
-           1. 基本レイアウトと全体設定
-        ========================================== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; overflow: hidden; }
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
@@ -28,9 +29,6 @@
         textarea#main-input { flex-grow: 1; resize: none; padding: 10px; font-size: 16px; border: 1px solid #95a5a6; border-radius: 5px; color: #595959; outline: none; transition: border-color 0.2s, box-shadow 0.2s; overflow-y: hidden; line-height: 1.5; }
         textarea#main-input:focus { border-color: #2e648c; box-shadow: 0 0 0 2px rgba(46, 100, 140, 0.2); }
         
-        /* ==========================================
-           2. コントロールパネル
-        ========================================== */
         #control-area { height: auto; flex: none; background-color: #ecf0f1; display: flex; justify-content: space-between; align-items: stretch; padding: 0 10px 15px 10px; gap: 15px; }
         #radar-panel { display: flex; gap: 10px; font-family: sans-serif; font-size: 12px; color: #595959; flex: 1; align-items: center; }
         .radar-col { display: flex; flex-direction: column; gap: 5px; }
@@ -45,9 +43,6 @@
         .btn-send { background-color: #2980b9; color: #ffffff; flex: 1; font-size: 14px; }
         #timer-container { display: flex; gap: 8px; font-family: monospace; font-size: 14px; font-weight: bold; white-space: nowrap; justify-content: flex-end; align-items: center; color: #333333; }
         
-        /* =========================================
-           3. サイドバー・暗幕（オーバーレイ）
-        ========================================== */
         #sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 35; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; }
         #sidebar-overlay.open { opacity: 1; visibility: visible; }
         
@@ -73,9 +68,6 @@
         .console-textarea { width: 100%; resize: none; padding: 8px; border-radius: 5px; border: none; font-size: 14px; background: #ecf0f1; color: #2c3e50; line-height: 1.4; outline: none; }
         input[type=password], input[type=month], input[type=file] { width: 100%; padding: 10px; border-radius: 5px; border: none; font-size: 13px; background: #ecf0f1; color: #2c3e50; }
         
-        /* ==========================================
-           4. 右舷・SPA画面切り替え用CSS
-        ========================================== */
         .view-hidden { display: none !important; }
         #rs-view-main, #rs-view-memos { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
@@ -103,7 +95,6 @@
                 <div style="font-size: 12px; color:#ecf0f1;">投函リスト</div>
                 <button type="button" id="clear-post-btn" style="background: #7f8c8d; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;" onclick="clearPostedFiles()">全クリア</button>
             </div>
-            <!-- ▼パッチ適用: 可視化用コンテナ -->
             <div id="post-list-container" style="background:#2c3e50; padding:8px; border-radius:4px; min-height:30px; font-size:12px; color:#95a5a6; display:flex; flex-direction:column; gap:4px;">
                 投函待ち...
             </div>
@@ -163,7 +154,7 @@
                 <div class="right-action-row">
                     <div class="console-title">System Instruction</div>
                     <div class="right-action-buttons">
-                        <button class="btn-action-save" data-target="sys-prompt">保存</button>
+                        <button class="btn-action-save" data-target="sys-prompt">雲へ保存</button>
                         <button class="btn-action-clear" data-target="sys-prompt">消去</button>
                     </div>
                 </div>
@@ -173,7 +164,7 @@
                 <div class="right-action-row">
                     <div class="console-title">Saved Information</div>
                     <div class="right-action-buttons">
-                        <button class="btn-action-save" data-target="saved-info">保存</button>
+                        <button class="btn-action-save" data-target="saved-info">雲へ保存</button>
                         <button class="btn-action-clear" data-target="saved-info">消去</button>
                     </div>
                 </div>
@@ -195,7 +186,7 @@
                 <div style="display: flex; gap: 8px;">
                     <button id="btn-delete-memo" class="btn-action-clear" style="background:#c0392b; flex:1; padding: 10px 0;">削除</button>
                     <button id="btn-transfer-memo" class="btn-action-save" style="background:#8e44ad; flex:1.5; padding: 10px 0;">入力欄へ転送</button>
-                    <button id="btn-save-memo" class="btn-action-save" style="flex:1.5; padding: 10px 0;">保存・更新</button>
+                    <button id="btn-save-memo" class="btn-action-save" style="flex:1.5; padding: 10px 0;">雲へ保存・更新</button>
                 </div>
             </div>
         </div>
@@ -203,7 +194,7 @@
 
     <header>
         <button id="btn-eruda" onclick="loadEruda()">Eruda</button>
-        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">版 20261021-1</span></div>
+        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">Firebaseマスターコンソール 18号</span></div>
     </header>
 
     <div id="log-window"></div>
@@ -234,6 +225,18 @@
     </div>
 
     <script>
+        // ▼ Firebaseの初期化 (船長のConfig)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlz26igDEILsZBL5LrVVynx6KlsKu6e8U",
+            authDomain: "sneezer31-78845.firebaseapp.com",
+            projectId: "sneezer31-78845",
+            storageBucket: "sneezer31-78845.firebasestorage.app",
+            messagingSenderId: "1094107940035",
+            appId: "1:1094107940035:web:2f5cfbcccf313feac7ce76"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) { registration.unregister(); }
@@ -251,12 +254,10 @@
             updateBodyHeight();
         }
 
-        var STORAGE_KEY = "fleet_v18";
         var API_KEY_VAULT = "gemini_api_key";
         var TOKEN_VAULT = "gemini_out_tokens";
         var INPUT_TOKEN_VAULT = "gemini_in_tokens";
         var WALTZ_COUNT_VAULT = "gemini_waltz_count";
-        var MEMO_VAULT = "gemini_memos_array";
         
         var chatLogArray = [];
         var memoArray = [];
@@ -270,7 +271,6 @@
         var postedFiles = [];
         var CODE_EXT = { html: "html", js: "js", javascript: "js", css: "css", json: "json", md: "md", markdown: "md", txt: "txt", py: "py", python: "py" };
         
-        // ▼パッチ適用: rawText(元の文字列全体)も記録するように改修
         function extractCodeBlocks(text) { 
             var BT = "`"; 
             var FENCE_OPEN = new RegExp("^" + BT + BT + BT + "([A-Za-z0-9_+-]*)\\s*$"); 
@@ -303,7 +303,6 @@
         
         function downloadText(name, content) { var url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function() { URL.revokeObjectURL(url); }, 1000); }
         
-        // ▼パッチ適用: ポストの可視化リストを描画する関数
         function renderPostList() {
             var container = document.getElementById("post-list-container");
             container.innerHTML = "";
@@ -314,29 +313,20 @@
             postedFiles.forEach(function(f, index) {
                 var div = document.createElement("div");
                 div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:4px 8px; border-radius:3px;";
-                
                 var nameSpan = document.createElement("span");
                 nameSpan.style.cssText = "white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:85%; color:#f1c40f;";
                 nameSpan.textContent = "📄 " + f.name;
-                
                 var delBtn = document.createElement("button");
                 delBtn.style.cssText = "background:#c0392b; color:white; border:none; border-radius:3px; width:20px; height:20px; display:flex; justify-content:center; align-items:center; cursor:pointer;";
                 delBtn.textContent = "✖";
-                delBtn.onclick = function() {
-                    postedFiles.splice(index, 1);
-                    renderPostList();
-                };
-                
-                div.appendChild(nameSpan);
-                div.appendChild(delBtn);
-                container.appendChild(div);
+                delBtn.onclick = function() { postedFiles.splice(index, 1); renderPostList(); };
+                div.appendChild(nameSpan); div.appendChild(delBtn); container.appendChild(div);
             });
         }
 
         function handleFilePost(e) { 
             var files = e.target.files; 
             if (!files || files.length === 0) return; 
-            
             var loadedCount = 0;
             for(var i = 0; i < files.length; i++) {
                 (function(file) {
@@ -344,23 +334,15 @@
                     reader.onload = function() { 
                         postedFiles.push({ name: file.name, content: String(reader.result) }); 
                         loadedCount++;
-                        if (loadedCount === files.length) {
-                            renderPostList(); // ▼UI更新
-                            e.target.value = ""; 
-                        }
+                        if (loadedCount === files.length) { renderPostList(); e.target.value = ""; }
                     }; 
                     reader.readAsText(file);
                 })(files[i]);
             }
         }
 
-        function clearPostedFiles() {
-            postedFiles = [];
-            renderPostList(); // ▼UI更新
-            document.getElementById("file-post").value = "";
-        }
+        function clearPostedFiles() { postedFiles = []; renderPostList(); document.getElementById("file-post").value = ""; }
 
-        // ▼パッチ適用: 郵便受けに✂️ボタンを追加
         function updateMailbox(aiText) { 
             var blocks = extractCodeBlocks(aiText); 
             var container = document.getElementById("mailbox-container"); 
@@ -377,7 +359,6 @@
                 
                 var wrapper = document.createElement("div");
                 wrapper.style.cssText = "display:flex; gap:4px; margin-bottom:4px;";
-                
                 var btnDL = document.createElement("button"); 
                 btnDL.className = "btn-small"; 
                 btnDL.style.cssText = "flex:1; text-align:left; padding:8px; background:#27ae60; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"; 
@@ -400,27 +381,29 @@
                         if(container.children.length === 0) container.innerHTML = "荷物はありません";
                     }
                 };
-                
-                wrapper.appendChild(btnDL);
-                wrapper.appendChild(btnPurge);
-                container.appendChild(wrapper); 
+                wrapper.appendChild(btnDL); wrapper.appendChild(btnPurge); container.appendChild(wrapper); 
             }); 
         }
 
-        // ▼パッチ適用: ログから該当コードを置換・消去する特異点関数
-        function purgeCodeFromLog(rawTextToReplace) {
+        async function purgeCodeFromLog(rawTextToReplace) {
             var purged = false;
             for (var i = chatLogArray.length - 1; i >= 0; i--) {
-                if (chatLogArray[i].sender === "AI" && chatLogArray[i].text.includes(rawTextToReplace)) {
+                if (chatLogArray[i].sender === "kanae" && chatLogArray[i].text.includes(rawTextToReplace)) {
                     chatLogArray[i].text = chatLogArray[i].text.replace(rawTextToReplace, "\n[※このコードは船長によって郵便受けから抽出・パージされました]\n");
+                    chatLogArray[i].updated_at = Date.now();
+                    
+                    // Firebaseも更新
+                    await db.collection("records").doc(chatLogArray[i].id.toString()).update({
+                        text: chatLogArray[i].text,
+                        updated_at: chatLogArray[i].updated_at
+                    });
                     purged = true;
                     break; 
                 }
             }
             if (purged) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 renderLogs();
-                alert("コードを抽出・パージしました。通信ペイロードが軽くなりました！");
+                alert("コードを抽出・パージしました。Firebase上のデータも更新されました！");
             }
         }
 
@@ -477,11 +460,24 @@
             else if (xDiff < -50) { if (rightPanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX < 100 && !consolePanel.classList.contains("open")) openSidebar(); }
         }
 
+        // ▼パッチ適用: プロンプト保存をFirebase直結に変更
         document.querySelectorAll('.btn-action-save').forEach(function(btn) {
-            if (btn.id === 'btn-transfer-memo') return;
-            btn.onclick = function() {
+            if (btn.id === 'btn-transfer-memo' || btn.id === 'btn-save-memo') return;
+            btn.onclick = async function() {
                 var targetId = this.getAttribute('data-target');
-                if (targetId) { var val = document.getElementById(targetId).value; localStorage.setItem("gemini_" + targetId.replace('-', '_'), val); }
+                if (targetId) { 
+                    var val = document.getElementById(targetId).value; 
+                    var updateData = { updated_at: Date.now() };
+                    if (targetId === 'sys-prompt') updateData.sys_prompt = val;
+                    if (targetId === 'saved-info') updateData.saved_info = val;
+                    
+                    await db.collection("records").doc("persona_kanae").set({
+                        id: "persona_kanae",
+                        app_type: "system_config",
+                        persona_name: "穂積かなえ",
+                        ...updateData
+                    }, { merge: true });
+                }
                 var originalText = this.innerText; this.innerText = "保存完了"; this.style.backgroundColor = "#27ae60"; 
                 setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#2980b9"; }, 1500);
             };
@@ -491,8 +487,13 @@
             if (btn.id === 'btn-delete-memo') return;
             btn.onclick = function() {
                 var targetId = this.getAttribute('data-target');
-                if (targetId && confirm("この領域のテキストを消去してよろしいですか？")) {
-                    document.getElementById(targetId).value = ""; localStorage.removeItem("gemini_" + targetId.replace('-', '_'));
+                if (targetId && confirm("この領域のテキストを消去してよろしいですか？（クラウド上のデータも消去されます）")) {
+                    document.getElementById(targetId).value = ""; 
+                    var updateData = { updated_at: Date.now() };
+                    if (targetId === 'sys-prompt') updateData.sys_prompt = "";
+                    if (targetId === 'saved-info') updateData.saved_info = "";
+                    db.collection("records").doc("persona_kanae").set(updateData, { merge: true });
+                    
                     var originalText = this.innerText; this.innerText = "消去完了"; this.style.backgroundColor = "#c0392b"; 
                     setTimeout(() => { this.innerText = originalText; this.style.backgroundColor = "#7f8c8d"; }, 1500);
                 }
@@ -524,11 +525,15 @@
             else { memoEditor.value = ''; }
         }
 
-        document.getElementById('btn-add-memo').onclick = function() { memoArray.unshift(""); activeMemoIndex = 0; saveMemosToStorage(); renderMemoDial(); memoEditor.focus(); };
+        document.getElementById('btn-add-memo').onclick = async function() { 
+            memoArray.unshift(""); activeMemoIndex = 0; 
+            await saveMemosToStorage(); renderMemoDial(); memoEditor.focus(); 
+        };
 
-        document.getElementById('btn-save-memo').onclick = function() {
+        document.getElementById('btn-save-memo').onclick = async function() {
             if (activeMemoIndex >= 0) {
-                memoArray[activeMemoIndex] = memoEditor.value; saveMemosToStorage(); renderMemoDial();
+                memoArray[activeMemoIndex] = memoEditor.value; 
+                await saveMemosToStorage(); renderMemoDial();
                 var btn = this; var originalText = btn.innerText; btn.innerText = "更新完了"; btn.style.backgroundColor = "#27ae60"; 
                 setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "#2980b9"; }, 1500);
             }
@@ -542,20 +547,23 @@
             }
         };
 
-        document.getElementById('btn-delete-memo').onclick = function() {
+        document.getElementById('btn-delete-memo').onclick = async function() {
             if (activeMemoIndex >= 0) {
-                if (confirm("このメモを完全に削除しますか？")) { memoArray.splice(activeMemoIndex, 1); activeMemoIndex = memoArray.length > 0 ? 0 : -1; saveMemosToStorage(); renderMemoDial(); }
+                if (confirm("このメモを完全に削除しますか？（クラウドからも消去されます）")) { 
+                    memoArray.splice(activeMemoIndex, 1); activeMemoIndex = memoArray.length > 0 ? 0 : -1; 
+                    await saveMemosToStorage(); renderMemoDial(); 
+                }
             }
         };
 
-        function saveMemosToStorage() { localStorage.setItem(MEMO_VAULT, JSON.stringify(memoArray)); }
-        function migrateOldMemos() {
-            var m1 = localStorage.getItem('gemini_memo1'); var m2 = localStorage.getItem('gemini_memo2'); var m3 = localStorage.getItem('gemini_memo3');
-            var migrated = false;
-            if (m1) { memoArray.push(m1); localStorage.removeItem('gemini_memo1'); migrated = true; }
-            if (m2) { memoArray.push(m2); localStorage.removeItem('gemini_memo2'); migrated = true; }
-            if (m3) { memoArray.push(m3); localStorage.removeItem('gemini_memo3'); migrated = true; }
-            if (migrated) saveMemosToStorage();
+        // ▼パッチ適用: メモの保存もFirebase直結
+        async function saveMemosToStorage() { 
+            await db.collection("records").doc("memo_master").set({
+                id: "memo_master",
+                app_type: "memo_master",
+                memos: memoArray,
+                updated_at: Date.now()
+            });
         }
 
         inputArea.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
@@ -614,16 +622,17 @@
         async function fetchGeminiAPI(isAutoRetry = false) {
             var apiKey = localStorage.getItem(API_KEY_VAULT); if (!apiKey) { alert("APIキーがありません。"); return null; }
 
+            // ▼パッチ適用: APIペイロード作成を画面表示中の現役ログから抽出
             var sendLogs = chatLogArray.slice();
-            while (sendLogs.length > 0 && sendLogs[0].sender !== "船長") { sendLogs.shift(); }
+            while (sendLogs.length > 0 && sendLogs[0].sender !== "User") { sendLogs.shift(); }
             if (sendLogs.length === 0) return null;
 
             var allContents = [];
             sendLogs.forEach(function(log) {
-                var role = log.sender === "船長" ? "user" : "model";
+                var role = log.sender === "User" ? "user" : "model";
                 var parts = [{ text: log.text }];
                 
-                if (log.attachedFiles) {
+                if (log.attachedFiles && log.attachedFiles.length > 0) {
                     log.attachedFiles.forEach(function(f) {
                         parts.push({ text: "\n\n[参照ファイル: " + f.name + "]\n" + f.content });
                     });
@@ -637,8 +646,8 @@
                 }
             });
 
-            var sysPrompt = localStorage.getItem("gemini_sys_prompt") || "";
-            var savedInfo = localStorage.getItem("gemini_saved_info") || "";
+            var sysPrompt = document.getElementById("sys-prompt").value || "";
+            var savedInfo = document.getElementById("saved-info").value || "";
             var finalInstruction = sysPrompt;
             if (savedInfo.trim() !== "") { finalInstruction += "\n\n[Saved Information]\n" + savedInfo; }
             finalInstruction += "\n\n【検索ツール実行に関する厳格なプロトコル】\n・ユーザーから明確な検索キーワードや調査対象が提示された場合のみ、Google Searchツールを使用すること。\n・「検索機能は使えるか？」等の能力を問う質問にはツールを起動せず、テキストのみで応答すること。\n・検索キーワードが空のままツールを起動することは重大なシステムエラーを引き起こすため、情報の補足をユーザーに求めること。";
@@ -721,10 +730,10 @@
         }
 
         function buildLogElement(log, index) {
-            var wrapper = document.createElement("div"); wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
+            var wrapper = document.createElement("div"); wrapper.className = log.sender === "User" ? "log-user" : "log-ai";
             var meta = document.createElement("div"); meta.className = "log-meta";
             var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "log-checkbox"; cb.value = index; meta.appendChild(cb);
-            var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "船長" ? " 船長：" : " かなえ："); meta.appendChild(span);
+            var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "User" ? " 船長：" : " かなえ："); meta.appendChild(span);
             var textNode = document.createElement("div"); textNode.style.whiteSpace = "pre-wrap"; textNode.textContent = log.text;
             
             if (log.attachedFiles && log.attachedFiles.length > 0) {
@@ -759,8 +768,8 @@
             logArea.scrollTop = logArea.scrollHeight; updateRadar();
         }
 
-        window.onload = function() {
-            var savedJSON = localStorage.getItem(STORAGE_KEY); if (savedJSON) chatLogArray = JSON.parse(savedJSON);
+        // ▼パッチ適用: 起動時にFirebaseからデータを読み込む
+        window.onload = async function() {
             var savedTokens = localStorage.getItem(TOKEN_VAULT); if (savedTokens) totalOutputTokens = parseInt(savedTokens);
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
             var savedWaltz = localStorage.getItem(WALTZ_COUNT_VAULT); if (savedWaltz) sessionWaltzCount = parseInt(savedWaltz);
@@ -771,12 +780,33 @@
                 activeCacheLength = parseInt(localStorage.getItem("gemini_cache_length")) || 0;
                 activeCacheExpiry = parseInt(localStorage.getItem("gemini_cache_expiry")) || 0;
             }
-            var rightTextareas = ['sys-prompt', 'saved-info'];
-            rightTextareas.forEach(function(id) { var val = localStorage.getItem("gemini_" + id.replace('-', '_')); if (val) document.getElementById(id).value = val; });
+            
+            try {
+                var promptSnap = await db.collection("records").doc("persona_kanae").get();
+                if(promptSnap.exists) {
+                    var pData = promptSnap.data();
+                    if(pData.sys_prompt) document.getElementById('sys-prompt').value = pData.sys_prompt;
+                    if(pData.saved_info) document.getElementById('saved-info').value = pData.saved_info;
+                }
+            } catch(e) { console.error("プロンプト読込エラー", e); }
 
-            var savedMemos = localStorage.getItem(MEMO_VAULT);
-            if (savedMemos) memoArray = JSON.parse(savedMemos);
-            migrateOldMemos(); if (memoArray.length > 0) activeMemoIndex = 0;
+            try {
+                var memoSnap = await db.collection("records").doc("memo_master").get();
+                if(memoSnap.exists && memoSnap.data().memos) {
+                    memoArray = memoSnap.data().memos;
+                }
+                if (memoArray.length > 0) activeMemoIndex = 0;
+            } catch(e) { console.error("メモ読込エラー", e); }
+
+            try {
+                var chatSnap = await db.collection("records").where("app_type", "==", "chat").get();
+                chatLogArray = [];
+                chatSnap.forEach(doc => {
+                    var d = doc.data();
+                    if (d.status === "published") { chatLogArray.push(d); }
+                });
+                chatLogArray.sort((a, b) => a.created_at - b.created_at);
+            } catch(e) { console.error("チャット読込エラー", e); }
 
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
@@ -788,18 +818,27 @@
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if(!checked.length) return;
             var copyText = checked.map(cb => {
                 var log = chatLogArray[cb.value];
-                var senderName = log.sender === "船長" ? "船長：" : "かなえ：";
+                var senderName = log.sender === "User" ? "船長：" : "かなえ：";
                 return (log.time ? "【" + log.time + "】 " : "") + senderName + "\n" + log.text;
             }).join("\n\n---\n");
             navigator.clipboard.writeText(copyText).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
         };
         
-        document.getElementById("delete-checked-btn").onclick = function() {
+        // ▼パッチ適用: チェック削除はFirebase上から物理削除
+        document.getElementById("delete-checked-btn").onclick = async function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if (!checked.length) return;
-            if (confirm(checked.length + "件の歴史を削除しますか？")) {
+            if (confirm(checked.length + "件の歴史を物理削除しますか？\n（Firebase上からも完全に消去されます）")) {
                 var targetIndices = new Set(checked.map(cb => parseInt(cb.value, 10)));
-                chatLogArray = chatLogArray.filter((_, idx) => !targetIndices.has(idx)); enforceMemoryLimit();
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); closeAllSidebars();
+                var batch = db.batch();
+                checked.forEach(cb => {
+                    var log = chatLogArray[parseInt(cb.value, 10)];
+                    var ref = db.collection("records").doc(log.id.toString());
+                    batch.delete(ref);
+                });
+                await batch.commit();
+
+                chatLogArray = chatLogArray.filter((_, idx) => !targetIndices.has(idx)); 
+                enforceMemoryLimit(); renderLogs(); closeAllSidebars();
             }
         };
 
@@ -821,7 +860,8 @@
             var a = document.createElement("a"); a.href = url; a.download = "log_" + monthVal + ".json"; a.click(); URL.revokeObjectURL(url);
         };
 
-        document.getElementById("chunk-export-btn").onclick = function() {
+        // ▼パッチ適用: 5万字チャンク退避はFirebase上で「status: "archived"」に変更
+        document.getElementById("chunk-export-btn").onclick = async function() {
             if (chatLogArray.length === 0) { alert("退避する歴史がありません。"); return; }
             
             var chunkLogs = [];
@@ -832,50 +872,91 @@
                 charCount += chatLogArray[i].text.length;
                 chunkLogs.push(chatLogArray[i]);
                 splitIndex = i + 1;
-                if (charCount >= 50000 && chatLogArray[i].sender !== "船長") { break; }
+                if (charCount >= 50000 && chatLogArray[i].sender !== "User") { break; }
             }
             
             if (charCount < 30000 && chatLogArray.length === chunkLogs.length) {
                 if (!confirm("まだ5万字に達していません（現在約" + charCount + "字）。このまま全ての履歴を退避しますか？")) return;
             } else {
-                if (!confirm("最古の対話から約" + charCount + "字をチャンク化し、母艦の記憶から切り離して退避しますか？")) return;
+                if (!confirm("最古の対話から約" + charCount + "字をチャンク化し、Firebase上でアーカイブ（書庫行き）にしますか？\n（画面からは消えますが、クラウドには残ります）")) return;
             }
             
             var nowStr = getFormattedTime().replace(/[^0-9]/g, "");
             var url = URL.createObjectURL(new Blob([JSON.stringify(chunkLogs, null, 2)], { type: 'application/json' }));
             var a = document.createElement("a"); a.href = url; a.download = "chunk_kanae_50k_" + nowStr + ".json"; a.click(); URL.revokeObjectURL(url);
             
+            var batch = db.batch();
+            chunkLogs.forEach(log => {
+                var ref = db.collection("records").doc(log.id.toString());
+                batch.update(ref, { status: "archived", updated_at: Date.now() });
+            });
+            await batch.commit();
+            
             chatLogArray.splice(0, splitIndex);
-            enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); closeAllSidebars();
-            alert("チャンク化と母艦からの切り離しが完了しました！");
+            enforceMemoryLimit(); renderLogs(); closeAllSidebars();
+            alert("チャンク化とFirebase上でのアーカイブ化が完了しました！");
         };
 
         document.getElementById("import-btn").onclick = function() {
             var file = document.getElementById("import-file-input").files[0]; if (!file) { alert("ファイルを選択してください。"); return; }
             var reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     var importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) throw new Error("");
-                    if (confirm("現在のログと照合し、未知の歴史（差分）だけを追加しますか？")) {
-                        importedData.forEach(function(iLog) { if (!chatLogArray.some(function(eLog) { return eLog.time === iLog.time && eLog.sender === iLog.sender && eLog.text === iLog.text; })) chatLogArray.push(iLog); });
-                        chatLogArray.sort((a, b) => a.time.localeCompare(b.time)); enforceMemoryLimit(); localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); renderLogs(); alert("歴史の差分統合が完了しました！");
+                    if (confirm("過去の歴史（JSON）を統合スキーマに変換し、Firebaseのrecords棚にアップロードしますか？")) {
+                        var batch = db.batch();
+                        importedData.forEach(function(iLog) { 
+                            if (!chatLogArray.some(function(eLog) { return eLog.time === iLog.time && eLog.sender === iLog.sender && eLog.text === iLog.text; })) {
+                                iLog.app_type = "chat";
+                                iLog.sender = iLog.sender === "船長" ? "User" : "kanae";
+                                iLog.status = "published";
+                                if (!iLog.id) iLog.id = Date.now() + Math.floor(Math.random()*1000);
+                                iLog.created_at = iLog.id;
+                                iLog.updated_at = iLog.id;
+                                chatLogArray.push(iLog); 
+                                batch.set(db.collection("records").doc(iLog.id.toString()), iLog);
+                            }
+                        });
+                        await batch.commit();
+                        chatLogArray.sort((a, b) => a.created_at - b.created_at); enforceMemoryLimit(); renderLogs(); alert("歴史の差分アップロードが完了しました！");
                     }
                 } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
             }; reader.readAsText(file);
         };
 
-        document.getElementById("undo-btn").onclick = function() {
+        // ▼パッチ適用: UndoもFirebaseから物理削除
+        document.getElementById("undo-btn").onclick = async function() {
             if (chatLogArray.length === 0) return;
-            var lastLog = chatLogArray[chatLogArray.length - 1];
-            if (lastLog.sender === "船長") { chatLogArray.pop(); } 
-            else { chatLogArray.pop(); if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "船長") { chatLogArray.pop(); } sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray)); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); renderLogs(); closeAllSidebars();
+            var lastLog = chatLogArray.pop();
+            var batch = db.batch();
+            batch.delete(db.collection("records").doc(lastLog.id.toString()));
+
+            if (lastLog.sender !== "User") { 
+                if (chatLogArray.length > 0 && chatLogArray[chatLogArray.length - 1].sender === "User") { 
+                    var lastUserLog = chatLogArray.pop();
+                    batch.delete(db.collection("records").doc(lastUserLog.id.toString()));
+                } 
+                sessionWaltzCount = Math.max(0, sessionWaltzCount - 1); localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount); 
+            }
+            await batch.commit();
+            renderLogs(); closeAllSidebars();
         };
 
-        document.getElementById("reset-btn").onclick = function() {
-            if (confirm("金庫を完全に空にしますか？")) { chatLogArray = []; sessionWaltzCount = 0; localStorage.removeItem(STORAGE_KEY); localStorage.setItem(WALTZ_COUNT_VAULT, 0); timeHistory = []; renderTimers(); renderLogs(); closeAllSidebars(); }
+        // ▼パッチ適用: 全消去もFirebaseから物理削除
+        document.getElementById("reset-btn").onclick = async function() {
+            if (confirm("金庫を完全に空にし、画面上の全ログをFirebaseからも物理削除しますか？")) { 
+                var batch = db.batch();
+                chatLogArray.forEach(log => {
+                    batch.delete(db.collection("records").doc(log.id.toString()));
+                });
+                await batch.commit();
+                
+                chatLogArray = []; sessionWaltzCount = 0; localStorage.setItem(WALTZ_COUNT_VAULT, 0); 
+                timeHistory = []; renderTimers(); renderLogs(); closeAllSidebars(); 
+            }
         };
 
+        // ▼パッチ適用: 送受信時にFirebaseに統合スキーマで直接保存
         sendBtn.onclick = async function() {
             var text = inputArea.value;
             var currentFiles = postedFiles.length > 0 ? postedFiles.slice() : null; 
@@ -892,17 +973,26 @@
                     new Promise(function(r) { setTimeout(r, 100); })
                 ]);
                 
-                chatLogArray.push({ 
-                    sender: "船長", 
+                var nowNum = Date.now();
+                var userLog = { 
+                    id: nowNum,
+                    app_type: "chat",
+                    sender: "User", 
                     time: getFormattedTime(), 
                     text: text || "（ファイルのみ送信）", 
-                    attachedFiles: currentFiles 
-                }); 
-                appendLogElement(chatLogArray.length - 1);
+                    attachedFiles: currentFiles || [],
+                    tags: [],
+                    linked_ids: [],
+                    status: "published",
+                    created_at: nowNum,
+                    updated_at: nowNum
+                };
                 
-                if (currentFiles) {
-                    clearPostedFiles(); // ▼UIリセット関数を呼び出し
-                }
+                chatLogArray.push(userLog); 
+                appendLogElement(chatLogArray.length - 1);
+                await db.collection("records").doc(nowNum.toString()).set(userLog);
+                
+                if (currentFiles) { clearPostedFiles(); }
 
                 setTimeout(() => { inputArea.value = ""; }, 10);
 
@@ -911,15 +1001,30 @@
                 timeHistory.push(((performance.now() - startTime) / 1000).toFixed(1) + "秒"); if (timeHistory.length > 3) timeHistory.shift(); renderTimers();
 
                 if (aiResponseText !== null) {
-                    chatLogArray.push({ sender: "AI", time: getFormattedTime(), text: aiResponseText });
+                    var aiNum = Date.now();
+                    var aiLog = { 
+                        id: aiNum,
+                        app_type: "chat",
+                        sender: "kanae", 
+                        time: getFormattedTime(), 
+                        text: aiResponseText, 
+                        attachedFiles: [],
+                        tags: [],
+                        linked_ids: [],
+                        status: "published",
+                        created_at: aiNum,
+                        updated_at: aiNum
+                    };
+                    
+                    chatLogArray.push(aiLog);
                     sessionWaltzCount++; localStorage.setItem(WALTZ_COUNT_VAULT, sessionWaltzCount);
                     appendLogElement(chatLogArray.length - 1);
                     updateMailbox(aiResponseText);
+                    await db.collection("records").doc(aiNum.toString()).set(aiLog);
                 }
 
                 var lenBefore = chatLogArray.length;
                 enforceMemoryLimit();
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
                 if (chatLogArray.length !== lenBefore) renderLogs();
 
                 sendBtn.disabled = false; sendBtn.innerText = "送 信";
