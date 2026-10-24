@@ -14,7 +14,7 @@
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; overflow: hidden; overflow-x: hidden}
+        html, body { height: 100%; width: 100%; max-width: 100vw; overflow: hidden; overflow-x: hidden; overscroll-behavior: none; touch-action: pan-y; }
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
         
         header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
@@ -46,11 +46,11 @@
         #sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 35; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; }
         #sidebar-overlay.open { opacity: 1; visibility: visible; }
         
-        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; transition: left 0.3s ease; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; }
-        #sidebar-console.open { left: 0; }
+        #sidebar-console { position: fixed; top: 0; left: -300px; width: 300px; height: 100dvh; background-color: #34495e; color: white; z-index: 40; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); overflow-y: auto; font-family: sans-serif; visibility: hidden; transition: left 0.3s ease, visibility 0s linear 0.3s; }
+        #sidebar-console.open { left: 0; visibility: visible; transition: left 0.3s ease, visibility 0s; }
         
-        #right-sidebar { position: fixed; top: 0; right: 0; transform: translateX(100%); width: 75vw; height: 100dvh; background-color: #34495e; color: white; transition: transform 0.3s ease; z-index: 40; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); font-family: sans-serif; overflow-y: hidden; }
-#right-sidebar.open { transform: translateX(0); }
+        #right-sidebar { position: fixed; top: 0; right: 0; transform: translateX(100%); width: 75vw; height: 100dvh; background-color: #34495e; color: white; z-index: 40; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.5); font-family: sans-serif; overflow-y: hidden; visibility: hidden; transition: transform 0.3s ease, visibility 0s linear 0.3s; }
+        #right-sidebar.open { transform: translateX(0); visibility: visible; transition: transform 0.3s ease, visibility 0s; }
         
         .console-section { border-bottom: 1px solid #7f8c8d; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .console-section:last-child { border-bottom: none; padding-bottom: 0; }
@@ -194,7 +194,7 @@
 
     <header>
         <button id="btn-eruda" onclick="loadEruda()">Eruda</button>
-        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">Firebaseマスターコンソール 18号</span></div>
+        <div id="secretary-name">穂積かなえ主席書記官 <span style="font-size:11px; font-weight:normal; opacity:0.7;">Firebaseマスターコンソール 18号 版 20261024-1</span></div>
     </header>
 
     <div id="log-window"></div>
@@ -244,7 +244,7 @@
         }
 
         if (window.visualViewport) {
-            function updateBodyHeight() { document.body.style.height = window.visualViewport.height + "px"; window.scrollTo(0, 0); }
+            function updateBodyHeight() { document.body.style.height = window.visualViewport.height + "px"; window.scrollTo(0, 0); document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0; }
             window.visualViewport.addEventListener("resize", function() {
                 updateBodyHeight(); setTimeout(function() { updateBodyHeight(); document.getElementById("control-area").scrollIntoView(false); }, 400);
             });
@@ -259,6 +259,9 @@
         var INPUT_TOKEN_VAULT = "gemini_in_tokens";
         var WALTZ_COUNT_VAULT = "gemini_waltz_count";
         
+        var MEMORY_LIMIT_CHARS = 100000;
+        var BATCH_SIZE = 400;
+        
         var chatLogArray = [];
         var memoArray = [];
         var activeMemoIndex = -1;
@@ -267,6 +270,13 @@
         var totalInputTokens = 0;
         var sessionWaltzCount = 0;
         var timeHistory = []; 
+        
+        // 起動時の読み込みが成功するまで false。false の間は送信と書き込みを止める。
+        var bootOK = false;
+        function requireBoot() {
+            if (!bootOK) { alert("Firebaseからの読み込みが終わっていません。完了するまで操作できません。"); return false; }
+            return true;
+        }
         
         var postedFiles = [];
         var CODE_EXT = { html: "html", js: "js", javascript: "js", css: "css", json: "json", md: "md", markdown: "md", txt: "txt", py: "py", python: "py" };
@@ -430,6 +440,9 @@
         var inputArea = document.getElementById("main-input");
         var sendBtn = document.querySelector(".btn-send");
         
+        // 読み込みが終わるまで送信を止める
+        sendBtn.disabled = true; sendBtn.innerText = "読み込み中...";
+        
         var consolePanel = document.getElementById("sidebar-console");
         var rightPanel = document.getElementById("right-sidebar");
         var overlay = document.getElementById("sidebar-overlay");
@@ -455,15 +468,26 @@
         function handleSwipe() {
             var xDiff = touchStartX - touchEndX;
             var yDiff = Math.abs(touchStartY - touchEndY);
+            window.scrollTo(0, 0); document.documentElement.scrollLeft = 0; document.body.scrollLeft = 0;
             if (yDiff > Math.abs(xDiff)) return; 
             if (xDiff > 50) { if (consolePanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX > window.innerWidth - 100 && !rightPanel.classList.contains("open")) openRightSidebar(); } 
             else if (xDiff < -50) { if (rightPanel.classList.contains("open")) closeAllSidebars(); else if (touchStartX < 100 && !consolePanel.classList.contains("open")) openSidebar(); }
+        }
+
+        // ▼ 500件上限を避けるため、分割して書き込む共通関数
+        async function batchedWrite(items, apply) {
+            for (var i = 0; i < items.length; i += BATCH_SIZE) {
+                var batch = db.batch();
+                items.slice(i, i + BATCH_SIZE).forEach(function(x) { apply(batch, x); });
+                await batch.commit();
+            }
         }
 
         // ▼パッチ適用: プロンプト保存をFirebase直結に変更
         document.querySelectorAll('.btn-action-save').forEach(function(btn) {
             if (btn.id === 'btn-transfer-memo' || btn.id === 'btn-save-memo') return;
             btn.onclick = async function() {
+                if (!requireBoot()) return;
                 var targetId = this.getAttribute('data-target');
                 if (targetId) { 
                     var val = document.getElementById(targetId).value; 
@@ -486,6 +510,7 @@
         document.querySelectorAll('.btn-action-clear').forEach(function(btn) {
             if (btn.id === 'btn-delete-memo') return;
             btn.onclick = function() {
+                if (!requireBoot()) return;
                 var targetId = this.getAttribute('data-target');
                 if (targetId && confirm("この領域のテキストを消去してよろしいですか？（クラウド上のデータも消去されます）")) {
                     document.getElementById(targetId).value = ""; 
@@ -526,11 +551,13 @@
         }
 
         document.getElementById('btn-add-memo').onclick = async function() { 
+            if (!requireBoot()) return;
             memoArray.unshift(""); activeMemoIndex = 0; 
             await saveMemosToStorage(); renderMemoDial(); memoEditor.focus(); 
         };
 
         document.getElementById('btn-save-memo').onclick = async function() {
+            if (!requireBoot()) return;
             if (activeMemoIndex >= 0) {
                 memoArray[activeMemoIndex] = memoEditor.value; 
                 await saveMemosToStorage(); renderMemoDial();
@@ -548,6 +575,7 @@
         };
 
         document.getElementById('btn-delete-memo').onclick = async function() {
+            if (!requireBoot()) return;
             if (activeMemoIndex >= 0) {
                 if (confirm("このメモを完全に削除しますか？（クラウドからも消去されます）")) { 
                     memoArray.splice(activeMemoIndex, 1); activeMemoIndex = memoArray.length > 0 ? 0 : -1; 
@@ -585,9 +613,8 @@
         }
 
         function enforceMemoryLimit() {
-            var STORAGE_LIMIT = 2000000;
             var totalChars = chatLogArray.reduce((acc, log) => acc + log.text.length, 0);
-            while (totalChars > STORAGE_LIMIT && chatLogArray.length >= 2) {
+            while (totalChars > MEMORY_LIMIT_CHARS && chatLogArray.length >= 2) {
                 var dropped1 = chatLogArray.shift(); var dropped2 = chatLogArray.shift(); totalChars -= (dropped1.text.length + dropped2.text.length);
             }
         }
@@ -768,7 +795,75 @@
             logArea.scrollTop = logArea.scrollHeight; updateRadar();
         }
 
-        // ▼パッチ適用: 起動時にFirebaseからデータを読み込む
+        // ▼ 起動時の読み込み（並列・新しい順・窓あり・失敗は画面に表示）
+        function withTimeout(promise, ms) {
+            return new Promise(function(resolve, reject) {
+                var t = setTimeout(function() { reject(new Error("読み込みが" + Math.round(ms / 1000) + "秒を超えました")); }, ms);
+                promise.then(function(v) { clearTimeout(t); resolve(v); }, function(e) { clearTimeout(t); reject(e); });
+            });
+        }
+
+        async function loadRecentChats() {
+            var logs = [], chars = 0, last = null, PAGE = 400;
+            while (chars < MEMORY_LIMIT_CHARS) {
+                var q = db.collection("records").orderBy("created_at", "desc").limit(PAGE);
+                if (last) q = q.startAfter(last);
+                var snap = await q.get();
+                if (snap.empty) break;
+                snap.forEach(function(doc) {
+                    var d = doc.data();
+                    if (d.app_type === "chat" && d.status === "published") { logs.push(d); chars += (d.text || "").length; }
+                });
+                last = snap.docs[snap.docs.length - 1];
+                if (snap.size < PAGE) break;
+            }
+            logs.sort(function(a, b) { return a.created_at - b.created_at; });
+            return logs;
+        }
+
+        function showBootError(err) {
+            logArea.innerHTML = "";
+            var box = document.createElement("div");
+            box.style.cssText = "color:#c0392b; font-size:14px; line-height:1.7; padding:10px; white-space:pre-wrap;";
+            box.textContent = "Firebaseからの読み込みに失敗しました。送信と書き込みは止めてあります。\n" + (err && err.message ? err.message : String(err));
+            var btn = document.createElement("button");
+            btn.textContent = "再試行";
+            btn.style.cssText = "display:block; margin-top:10px; padding:10px 20px; background:#2980b9; color:#fff;";
+            btn.onclick = bootLoad;
+            box.appendChild(btn); logArea.appendChild(box);
+            sendBtn.innerText = "読込失敗";
+            updateRadar();
+        }
+
+        async function bootLoad() {
+            bootOK = false;
+            sendBtn.disabled = true; sendBtn.innerText = "読み込み中...";
+            logArea.innerHTML = '<p class="log-empty" style="font-size: 12px; color: #95a5a6;">Firebaseから読み込み中...</p>';
+            try {
+                var results = await withTimeout(Promise.all([
+                    db.collection("records").doc("persona_kanae").get(),
+                    db.collection("records").doc("memo_master").get(),
+                    loadRecentChats()
+                ]), 45000);
+                var promptSnap = results[0], memoSnap = results[1];
+                if (promptSnap.exists) {
+                    var pData = promptSnap.data();
+                    if (pData.sys_prompt) document.getElementById('sys-prompt').value = pData.sys_prompt;
+                    if (pData.saved_info) document.getElementById('saved-info').value = pData.saved_info;
+                }
+                memoArray = (memoSnap.exists && memoSnap.data().memos) ? memoSnap.data().memos : [];
+                activeMemoIndex = memoArray.length > 0 ? 0 : -1;
+                chatLogArray = results[2];
+                enforceMemoryLimit();
+                bootOK = true;
+                renderLogs(); renderTimers();
+                sendBtn.disabled = false; sendBtn.innerText = "送 信";
+            } catch (e) {
+                console.error("起動時の読み込みエラー", e);
+                showBootError(e);
+            }
+        }
+
         window.onload = async function() {
             var savedTokens = localStorage.getItem(TOKEN_VAULT); if (savedTokens) totalOutputTokens = parseInt(savedTokens);
             var savedInTokens = localStorage.getItem(INPUT_TOKEN_VAULT); if (savedInTokens) totalInputTokens = parseInt(savedInTokens);
@@ -780,38 +875,11 @@
                 activeCacheLength = parseInt(localStorage.getItem("gemini_cache_length")) || 0;
                 activeCacheExpiry = parseInt(localStorage.getItem("gemini_cache_expiry")) || 0;
             }
-            
-            try {
-                var promptSnap = await db.collection("records").doc("persona_kanae").get();
-                if(promptSnap.exists) {
-                    var pData = promptSnap.data();
-                    if(pData.sys_prompt) document.getElementById('sys-prompt').value = pData.sys_prompt;
-                    if(pData.saved_info) document.getElementById('saved-info').value = pData.saved_info;
-                }
-            } catch(e) { console.error("プロンプト読込エラー", e); }
 
-            try {
-                var memoSnap = await db.collection("records").doc("memo_master").get();
-                if(memoSnap.exists && memoSnap.data().memos) {
-                    memoArray = memoSnap.data().memos;
-                }
-                if (memoArray.length > 0) activeMemoIndex = 0;
-            } catch(e) { console.error("メモ読込エラー", e); }
-
-            try {
-                var chatSnap = await db.collection("records").where("app_type", "==", "chat").get();
-                chatLogArray = [];
-                chatSnap.forEach(doc => {
-                    var d = doc.data();
-                    if (d.status === "published") { chatLogArray.push(d); }
-                });
-                chatLogArray.sort((a, b) => a.created_at - b.created_at);
-            } catch(e) { console.error("チャット読込エラー", e); }
-
-            renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
-            
             setInterval(updateCacheUI, 1000); updateCacheUI();
+
+            await bootLoad();
         };
 
         document.getElementById("copy-checked-btn").onclick = function() {
@@ -824,19 +892,19 @@
             navigator.clipboard.writeText(copyText).then(() => { alert(checked.length + "件の歴史をコピーしました。"); closeAllSidebars(); });
         };
         
-        // ▼パッチ適用: チェック削除はFirebase上から物理削除
+        // ▼パッチ適用: チェック削除はFirebase上から物理削除（分割書き込み）
         document.getElementById("delete-checked-btn").onclick = async function() {
+            if (!requireBoot()) return;
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if (!checked.length) return;
             if (confirm(checked.length + "件の歴史を物理削除しますか？\n（Firebase上からも完全に消去されます）")) {
                 var targetIndices = new Set(checked.map(cb => parseInt(cb.value, 10)));
-                var batch = db.batch();
-                checked.forEach(cb => {
-                    var log = chatLogArray[parseInt(cb.value, 10)];
-                    var ref = db.collection("records").doc(log.id.toString());
-                    batch.delete(ref);
-                });
-                await batch.commit();
-
+                var targets = checked.map(cb => chatLogArray[parseInt(cb.value, 10)]);
+                try {
+                    await batchedWrite(targets, function(batch, log) { batch.delete(db.collection("records").doc(log.id.toString())); });
+                } catch (err) {
+                    alert("削除に失敗しました。一部だけ消えている可能性があります。ページを開き直して確認してください。\n" + err.message);
+                    return;
+                }
                 chatLogArray = chatLogArray.filter((_, idx) => !targetIndices.has(idx)); 
                 enforceMemoryLimit(); renderLogs(); closeAllSidebars();
             }
@@ -862,6 +930,7 @@
 
         // ▼パッチ適用: 5万字チャンク退避はFirebase上で「status: "archived"」に変更
         document.getElementById("chunk-export-btn").onclick = async function() {
+            if (!requireBoot()) return;
             if (chatLogArray.length === 0) { alert("退避する歴史がありません。"); return; }
             
             var chunkLogs = [];
@@ -885,47 +954,123 @@
             var url = URL.createObjectURL(new Blob([JSON.stringify(chunkLogs, null, 2)], { type: 'application/json' }));
             var a = document.createElement("a"); a.href = url; a.download = "chunk_kanae_50k_" + nowStr + ".json"; a.click(); URL.revokeObjectURL(url);
             
-            var batch = db.batch();
-            chunkLogs.forEach(log => {
-                var ref = db.collection("records").doc(log.id.toString());
-                batch.update(ref, { status: "archived", updated_at: Date.now() });
-            });
-            await batch.commit();
+            try {
+                await batchedWrite(chunkLogs, function(batch, log) {
+                    batch.update(db.collection("records").doc(log.id.toString()), { status: "archived", updated_at: Date.now() });
+                });
+            } catch (err) {
+                alert("アーカイブ化に失敗しました。画面のログは変えていません。\n" + err.message);
+                return;
+            }
             
             chatLogArray.splice(0, splitIndex);
             enforceMemoryLimit(); renderLogs(); closeAllSidebars();
             alert("チャンク化とFirebase上でのアーカイブ化が完了しました！");
         };
 
+        // ▼ 歴史の搬入：時刻から決まるIDで、順序・重複・欠けを防ぐ
+        function normSender(s) { return (s === "User" || s === "船長") ? "User" : "kanae"; }
+        function timeToMs(t) {
+            var m = String(t || "").match(/(\d{4})\/(\d{1,2})\/(\d{1,2})[^\d]*(\d{1,2}):(\d{2})/);
+            if (!m) return null;
+            return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+        }
+        function dedupKey(time, sender, text) { return time + "\u0001" + sender + "\u0001" + text; }
+
         document.getElementById("import-btn").onclick = function() {
+            if (!requireBoot()) return;
             var file = document.getElementById("import-file-input").files[0]; if (!file) { alert("ファイルを選択してください。"); return; }
             var reader = new FileReader();
             reader.onload = async function(e) {
+                var importedData;
                 try {
-                    var importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) throw new Error("");
-                    if (confirm("過去の歴史（JSON）を統合スキーマに変換し、Firebaseのrecords棚にアップロードしますか？")) {
-                        var batch = db.batch();
-                        importedData.forEach(function(iLog) { 
-                            if (!chatLogArray.some(function(eLog) { return eLog.time === iLog.time && eLog.sender === iLog.sender && eLog.text === iLog.text; })) {
-                                iLog.app_type = "chat";
-                                iLog.sender = iLog.sender === "船長" ? "User" : "kanae";
-                                iLog.status = "published";
-                                if (!iLog.id) iLog.id = Date.now() + Math.floor(Math.random()*1000);
-                                iLog.created_at = iLog.id;
-                                iLog.updated_at = iLog.id;
-                                chatLogArray.push(iLog); 
-                                batch.set(db.collection("records").doc(iLog.id.toString()), iLog);
-                            }
-                        });
-                        await batch.commit();
-                        chatLogArray.sort((a, b) => a.created_at - b.created_at); enforceMemoryLimit(); renderLogs(); alert("歴史の差分アップロードが完了しました！");
-                    }
-                } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
-            }; reader.readAsText(file);
+                    importedData = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedData)) throw new Error("not array");
+                } catch (err) { alert("ファイルの読み込みに失敗しました。"); return; }
+
+                if (!confirm(importedData.length + "件を読み込みました。発言の時刻から順序を決めて、Firebaseのrecordsに差分だけ追加しますか？")) return;
+
+                var importBtn = document.getElementById("import-btn");
+                importBtn.disabled = true; importBtn.innerText = "搬入中...";
+                try {
+                    // 1. 時刻を読む（読めないものは除外して数える）
+                    var items = [], noTime = 0;
+                    importedData.forEach(function(iLog) {
+                        if (!iLog || typeof iLog !== "object") return;
+                        var ms = timeToMs(iLog.time);
+                        if (ms === null) { noTime++; return; }
+                        items.push({ src: iLog, ms: ms });
+                    });
+                    if (items.length === 0) { alert("時刻を読み取れた発言がありません。搬入しませんでした。"); return; }
+
+                    // 2. 既存データ（画面の窓 + Firebase上の同じ期間）から、重複判定とID衝突の材料を集める
+                    var minMs = items[0].ms, maxMs = items[0].ms;
+                    items.forEach(function(it) { if (it.ms < minMs) minMs = it.ms; if (it.ms > maxMs) maxMs = it.ms; });
+                    var keys = new Set(), usedIds = new Set();
+                    chatLogArray.forEach(function(l) { keys.add(dedupKey(l.time, normSender(l.sender), l.text)); usedIds.add(Number(l.id)); });
+                    var existSnap = await db.collection("records").where("created_at", ">=", minMs).where("created_at", "<=", maxMs + 60000).get();
+                    existSnap.forEach(function(doc) {
+                        var d = doc.data();
+                        if (d.app_type !== "chat") return;
+                        keys.add(dedupKey(d.time, normSender(d.sender), d.text)); usedIds.add(Number(d.id));
+                    });
+
+                    // 3. ファイルの順番を保ったまま、時刻からIDを作る
+                    var newLogs = [], dup = 0;
+                    items.forEach(function(it) {
+                        var src = it.src;
+                        var sender = normSender(src.sender);
+                        var text = String(src.text == null ? "" : src.text);
+                        var k = dedupKey(src.time, sender, text);
+                        if (keys.has(k)) { dup++; return; }
+                        keys.add(k);
+                        var id = it.ms;
+                        while (usedIds.has(id)) id++;
+                        usedIds.add(id);
+                        newLogs.push(Object.assign({}, src, {
+                            id: id,
+                            app_type: "chat",
+                            sender: sender,
+                            text: text,
+                            attachedFiles: Array.isArray(src.attachedFiles) ? src.attachedFiles : [],
+                            tags: Array.isArray(src.tags) ? src.tags : [],
+                            linked_ids: Array.isArray(src.linked_ids) ? src.linked_ids : [],
+                            status: "published",
+                            created_at: id,
+                            updated_at: id
+                        }));
+                    });
+
+                    // 4. 分割して書き込み、成功した分だけ画面の配列に足す
+                    var done = 0, failed = null;
+                    try {
+                        for (var i = 0; i < newLogs.length; i += BATCH_SIZE) {
+                            var part = newLogs.slice(i, i + BATCH_SIZE);
+                            var batch = db.batch();
+                            part.forEach(function(l) { batch.set(db.collection("records").doc(l.id.toString()), l); });
+                            await batch.commit();
+                            part.forEach(function(l) { chatLogArray.push(l); });
+                            done += part.length;
+                        }
+                    } catch (err) { failed = err; }
+
+                    chatLogArray.sort(function(a, b) { return a.created_at - b.created_at; });
+                    enforceMemoryLimit(); renderLogs();
+                    var msg = "追加 " + done + "件 / 重複で除外 " + dup + "件 / 時刻不明で除外 " + noTime + "件";
+                    if (failed) msg = "途中で失敗しました。" + msg + "\n未追加 " + (newLogs.length - done) + "件。同じファイルをもう一度搬入すれば、続きから足されます。\n" + failed.message;
+                    alert(msg);
+                } catch (err) {
+                    alert("搬入に失敗しました。\n" + err.message);
+                } finally {
+                    importBtn.disabled = false; importBtn.innerText = "JSONとして搬入";
+                }
+            };
+            reader.readAsText(file);
         };
 
         // ▼パッチ適用: UndoもFirebaseから物理削除
         document.getElementById("undo-btn").onclick = async function() {
+            if (!requireBoot()) return;
             if (chatLogArray.length === 0) return;
             var lastLog = chatLogArray.pop();
             var batch = db.batch();
@@ -942,14 +1087,17 @@
             renderLogs(); closeAllSidebars();
         };
 
-        // ▼パッチ適用: 全消去もFirebaseから物理削除
+        // ▼パッチ適用: 全消去もFirebaseから物理削除（分割書き込み。画面に読み込まれている分が対象）
         document.getElementById("reset-btn").onclick = async function() {
+            if (!requireBoot()) return;
             if (confirm("金庫を完全に空にし、画面上の全ログをFirebaseからも物理削除しますか？")) { 
-                var batch = db.batch();
-                chatLogArray.forEach(log => {
-                    batch.delete(db.collection("records").doc(log.id.toString()));
-                });
-                await batch.commit();
+                var targets = chatLogArray.slice();
+                try {
+                    await batchedWrite(targets, function(batch, log) { batch.delete(db.collection("records").doc(log.id.toString())); });
+                } catch (err) {
+                    alert("消去に失敗しました。一部だけ消えている可能性があります。ページを開き直して確認してください。\n" + err.message);
+                    return;
+                }
                 
                 chatLogArray = []; sessionWaltzCount = 0; localStorage.setItem(WALTZ_COUNT_VAULT, 0); 
                 timeHistory = []; renderTimers(); renderLogs(); closeAllSidebars(); 
@@ -958,6 +1106,7 @@
 
         // ▼パッチ適用: 送受信時にFirebaseに統合スキーマで直接保存
         sendBtn.onclick = async function() {
+            if (!bootOK) return;
             var text = inputArea.value;
             var currentFiles = postedFiles.length > 0 ? postedFiles.slice() : null; 
 
