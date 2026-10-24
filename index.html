@@ -100,8 +100,12 @@
             <input type="file" id="file-post" hidden multiple onchange="handleFilePost(event)">
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <div id="post-status" style="font-size: 12px; color:#bdc3c7;">投函待ち...</div>
-                <button type="button" id="clear-post-btn" style="background: #7f8c8d; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;" onclick="clearPostedFiles()">クリア</button>
+                <div style="font-size: 12px; color:#ecf0f1;">投函リスト</div>
+                <button type="button" id="clear-post-btn" style="background: #7f8c8d; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 10px; cursor: pointer;" onclick="clearPostedFiles()">全クリア</button>
+            </div>
+            <!-- ▼パッチ適用: 可視化用コンテナ -->
+            <div id="post-list-container" style="background:#2c3e50; padding:8px; border-radius:4px; min-height:30px; font-size:12px; color:#95a5a6; display:flex; flex-direction:column; gap:4px;">
+                投函待ち...
             </div>
             
             <hr style="border:0; border-top:1px dashed #7f8c8d; margin:12px 0;">
@@ -265,9 +269,70 @@
         
         var postedFiles = [];
         var CODE_EXT = { html: "html", js: "js", javascript: "js", css: "css", json: "json", md: "md", markdown: "md", txt: "txt", py: "py", python: "py" };
-        function extractCodeBlocks(text) { var BT = "`"; var FENCE_OPEN = new RegExp("^" + BT + BT + BT + "([A-Za-z0-9_+-]*)\\s*$"); var FENCE_CLOSE = new RegExp("^" + BT + BT + BT + "\\s*$"); var lines = String(text).split("\n"), blocks = [], cur = null; for (var i = 0; i < lines.length; i++) { var ln = lines[i]; if (cur === null) { var mo = ln.match(FENCE_OPEN); if (mo) cur = { lang: mo[1].toLowerCase(), lines: [], closed: false }; } else if (FENCE_CLOSE.test(ln)) { cur.closed = true; cur.code = cur.lines.join("\n"); blocks.push(cur); cur = null; } else { cur.lines.push(ln); } } if (cur !== null) { cur.code = cur.lines.join("\n"); blocks.push(cur); } return blocks; }
+        
+        // ▼パッチ適用: rawText(元の文字列全体)も記録するように改修
+        function extractCodeBlocks(text) { 
+            var BT = "`"; 
+            var FENCE_OPEN = new RegExp("^" + BT + BT + BT + "([A-Za-z0-9_+-]*)\\s*$"); 
+            var FENCE_CLOSE = new RegExp("^" + BT + BT + BT + "\\s*$"); 
+            var lines = String(text).split("\n"), blocks = [], cur = null; 
+            for (var i = 0; i < lines.length; i++) { 
+                var ln = lines[i]; 
+                if (cur === null) { 
+                    var mo = ln.match(FENCE_OPEN); 
+                    if (mo) cur = { lang: mo[1].toLowerCase(), lines: [], closed: false, rawLines: [ln] }; 
+                } else if (FENCE_CLOSE.test(ln)) { 
+                    cur.closed = true; 
+                    cur.code = cur.lines.join("\n"); 
+                    cur.rawLines.push(ln);
+                    cur.rawText = cur.rawLines.join("\n");
+                    blocks.push(cur); 
+                    cur = null; 
+                } else { 
+                    cur.lines.push(ln); 
+                    cur.rawLines.push(ln);
+                } 
+            } 
+            if (cur !== null) { 
+                cur.code = cur.lines.join("\n"); 
+                cur.rawText = cur.rawLines.join("\n");
+                blocks.push(cur); 
+            } 
+            return blocks; 
+        }
+        
         function downloadText(name, content) { var url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" })); var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function() { URL.revokeObjectURL(url); }, 1000); }
         
+        // ▼パッチ適用: ポストの可視化リストを描画する関数
+        function renderPostList() {
+            var container = document.getElementById("post-list-container");
+            container.innerHTML = "";
+            if (postedFiles.length === 0) {
+                container.innerHTML = "投函待ち...";
+                return;
+            }
+            postedFiles.forEach(function(f, index) {
+                var div = document.createElement("div");
+                div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#34495e; padding:4px 8px; border-radius:3px;";
+                
+                var nameSpan = document.createElement("span");
+                nameSpan.style.cssText = "white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:85%; color:#f1c40f;";
+                nameSpan.textContent = "📄 " + f.name;
+                
+                var delBtn = document.createElement("button");
+                delBtn.style.cssText = "background:#c0392b; color:white; border:none; border-radius:3px; width:20px; height:20px; display:flex; justify-content:center; align-items:center; cursor:pointer;";
+                delBtn.textContent = "✖";
+                delBtn.onclick = function() {
+                    postedFiles.splice(index, 1);
+                    renderPostList();
+                };
+                
+                div.appendChild(nameSpan);
+                div.appendChild(delBtn);
+                container.appendChild(div);
+            });
+        }
+
         function handleFilePost(e) { 
             var files = e.target.files; 
             if (!files || files.length === 0) return; 
@@ -280,8 +345,7 @@
                         postedFiles.push({ name: file.name, content: String(reader.result) }); 
                         loadedCount++;
                         if (loadedCount === files.length) {
-                            document.getElementById("post-status").textContent = postedFiles.length + "件のファイルが投函されています"; 
-                            document.getElementById("post-status").style.color = "#f1c40f"; 
+                            renderPostList(); // ▼UI更新
                             e.target.value = ""; 
                         }
                     }; 
@@ -292,12 +356,73 @@
 
         function clearPostedFiles() {
             postedFiles = [];
-            document.getElementById("post-status").textContent = "投函待ち...";
-            document.getElementById("post-status").style.color = "#bdc3c7";
+            renderPostList(); // ▼UI更新
             document.getElementById("file-post").value = "";
         }
 
-        function updateMailbox(aiText) { var blocks = extractCodeBlocks(aiText); var container = document.getElementById("mailbox-container"); container.innerHTML = ""; if (blocks.length === 0) { container.innerHTML = "荷物はありません"; return; } blocks.forEach(function(b, bi) { var codeLines = b.code.split("\n"); var fileName = null; var fm = (codeLines[0] || "").match(/FILE:\s*([^\s>*]+)/); var body = b.code; if (fm) { fileName = fm[1]; body = codeLines.slice(1).join("\n"); } else { fileName = "received_" + getFormattedTime().replace(/[^0-9]/g, "") + "_" + (bi + 1) + "." + (CODE_EXT[b.lang] || "txt"); } var btn = document.createElement("button"); btn.className = "btn-small"; btn.style.cssText = "width:100%; text-align:left; padding:8px; margin-bottom:4px; background:#27ae60; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"; btn.textContent = "📦 " + fileName + " (" + codeLines.length + "行)"; btn.disabled = !b.closed; if (!b.closed) { btn.style.background = "#c0392b"; btn.textContent = "⚠ [破損] " + fileName; } btn.onclick = function() { downloadText(fileName, body); }; container.appendChild(btn); }); }
+        // ▼パッチ適用: 郵便受けに✂️ボタンを追加
+        function updateMailbox(aiText) { 
+            var blocks = extractCodeBlocks(aiText); 
+            var container = document.getElementById("mailbox-container"); 
+            container.innerHTML = ""; 
+            if (blocks.length === 0) { container.innerHTML = "荷物はありません"; return; } 
+            
+            blocks.forEach(function(b, bi) { 
+                var codeLines = b.code.split("\n"); 
+                var fileName = null; 
+                var fm = (codeLines[0] || "").match(/FILE:\s*([^\s>*]+)/); 
+                var body = b.code; 
+                if (fm) { fileName = fm[1]; body = codeLines.slice(1).join("\n"); } 
+                else { fileName = "received_" + getFormattedTime().replace(/[^0-9]/g, "") + "_" + (bi + 1) + "." + (CODE_EXT[b.lang] || "txt"); } 
+                
+                var wrapper = document.createElement("div");
+                wrapper.style.cssText = "display:flex; gap:4px; margin-bottom:4px;";
+                
+                var btnDL = document.createElement("button"); 
+                btnDL.className = "btn-small"; 
+                btnDL.style.cssText = "flex:1; text-align:left; padding:8px; background:#27ae60; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"; 
+                btnDL.textContent = "📦 " + fileName; 
+                btnDL.disabled = !b.closed; 
+                if (!b.closed) { btnDL.style.background = "#c0392b"; btnDL.textContent = "⚠ [破損] " + fileName; } 
+                btnDL.onclick = function() { downloadText(fileName, body); }; 
+                
+                var btnPurge = document.createElement("button");
+                btnPurge.className = "btn-small";
+                btnPurge.style.cssText = "flex:none; width:40px; background:#e67e22; padding:8px 0; display:flex; justify-content:center; align-items:center; font-size:16px;";
+                btnPurge.innerHTML = "✂️";
+                btnPurge.title = "DL ＆ ログからパージ";
+                btnPurge.disabled = !b.closed;
+                btnPurge.onclick = function() {
+                    if(confirm("【抽出＆パージ】\nこのファイルをダウンロードし、会話履歴からこのコード部分を消去しますか？")) {
+                        downloadText(fileName, body);
+                        purgeCodeFromLog(b.rawText);
+                        wrapper.parentNode.removeChild(wrapper);
+                        if(container.children.length === 0) container.innerHTML = "荷物はありません";
+                    }
+                };
+                
+                wrapper.appendChild(btnDL);
+                wrapper.appendChild(btnPurge);
+                container.appendChild(wrapper); 
+            }); 
+        }
+
+        // ▼パッチ適用: ログから該当コードを置換・消去する特異点関数
+        function purgeCodeFromLog(rawTextToReplace) {
+            var purged = false;
+            for (var i = chatLogArray.length - 1; i >= 0; i--) {
+                if (chatLogArray[i].sender === "AI" && chatLogArray[i].text.includes(rawTextToReplace)) {
+                    chatLogArray[i].text = chatLogArray[i].text.replace(rawTextToReplace, "\n[※このコードは船長によって郵便受けから抽出・パージされました]\n");
+                    purged = true;
+                    break; 
+                }
+            }
+            if (purged) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
+                renderLogs();
+                alert("コードを抽出・パージしました。通信ペイロードが軽くなりました！");
+            }
+        }
 
         function loadEruda() {
             if (window.eruda) { eruda.show(); return; }
@@ -498,7 +623,6 @@
                 var role = log.sender === "船長" ? "user" : "model";
                 var parts = [{ text: log.text }];
                 
-                // ▼変更: 裏データ(attachedFiles)があればAPIペイロードにだけ忍ばせる
                 if (log.attachedFiles) {
                     log.attachedFiles.forEach(function(f) {
                         parts.push({ text: "\n\n[参照ファイル: " + f.name + "]\n" + f.content });
@@ -507,7 +631,6 @@
 
                 var lastContent = allContents[allContents.length - 1];
                 if (lastContent && lastContent.role === role) { 
-                    // 連続ターンの結合処理
                     lastContent.parts = lastContent.parts.concat(parts);
                 } else { 
                     allContents.push({ role: role, parts: parts }); 
@@ -597,7 +720,6 @@
             } catch (error) { alert("通信沈黙：サーバーへの接続に失敗しました。"); return null; }
         }
 
-        // 発言1件ぶんのDOMを作る（全件描画と、1件追加の両方で使う）
         function buildLogElement(log, index) {
             var wrapper = document.createElement("div"); wrapper.className = log.sender === "船長" ? "log-user" : "log-ai";
             var meta = document.createElement("div"); meta.className = "log-meta";
@@ -605,7 +727,6 @@
             var span = document.createElement("span"); span.innerHTML = (log.time || "") + (log.sender === "船長" ? " 船長：" : " かなえ："); meta.appendChild(span);
             var textNode = document.createElement("div"); textNode.style.whiteSpace = "pre-wrap"; textNode.textContent = log.text;
             
-            // ▼変更: 裏データ(attachedFiles)があれば、画面にはオシャレなクリップマークだけを描画
             if (log.attachedFiles && log.attachedFiles.length > 0) {
                 var attachDiv = document.createElement("div");
                 attachDiv.style.cssText = "font-size:12px; color:#8e44ad; font-weight:bold; margin-bottom:8px; padding:4px 8px; background:#f4f4f5; border-radius:4px; display:inline-block;";
@@ -619,7 +740,6 @@
             return wrapper;
         }
 
-        // 全件描画（起動時・削除・Undo・搬入など）。まとめて1回だけDOMに載せる
         function renderLogs() {
             logArea.innerHTML = ""; 
             if (chatLogArray.length === 0) {
@@ -632,7 +752,6 @@
             logArea.scrollTop = logArea.scrollHeight; updateRadar();
         }
 
-        // 末尾の1件だけを足す（送信時はこちらを使う）
         function appendLogElement(index) {
             var empty = logArea.querySelector(".log-empty");
             if (empty) empty.parentNode.removeChild(empty);
@@ -759,23 +878,20 @@
 
         sendBtn.onclick = async function() {
             var text = inputArea.value;
-            var currentFiles = postedFiles.length > 0 ? postedFiles.slice() : null; // ▼変更: ポストの荷物を取得
+            var currentFiles = postedFiles.length > 0 ? postedFiles.slice() : null; 
 
-            if (text !== "" || currentFiles) { // ▼変更: テキストが空でもファイルがあれば送信可能に
+            if (text !== "" || currentFiles) { 
                 sendBtn.disabled = true; sendBtn.innerText = "通信中..."; 
 
-                // 重い処理より先に、入力欄を空にして秒数を動かし始める
                 inputArea.value = ""; inputArea.style.height = 'auto';
                 let startTime = performance.now();
                 renderTimers("0.0秒...");
                 let timerInterval = setInterval(function() { renderTimers(((performance.now() - startTime) / 1000).toFixed(1) + "秒..."); }, 100);
-                // 1フレーム譲って、上の変更を画面に描いてから重い処理に入る（rAFが止まる場合に備えて100msで打ち切る）
                 await Promise.race([
                     new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 0); }); }),
                     new Promise(function(r) { setTimeout(r, 100); })
                 ]);
                 
-                // ▼変更: chatLogArrayにattachedFilesとして裏データを保存（保存は最後に1回）
                 chatLogArray.push({ 
                     sender: "船長", 
                     time: getFormattedTime(), 
@@ -784,12 +900,8 @@
                 }); 
                 appendLogElement(chatLogArray.length - 1);
                 
-                // ▼変更: ポストを空にしてUIをリセット
                 if (currentFiles) {
-                    postedFiles = [];
-                    document.getElementById("post-status").textContent = "投函待ち...";
-                    document.getElementById("post-status").style.color = "#bdc3c7";
-                    document.getElementById("file-post").value = "";
+                    clearPostedFiles(); // ▼UIリセット関数を呼び出し
                 }
 
                 setTimeout(() => { inputArea.value = ""; }, 10);
@@ -805,7 +917,6 @@
                     updateMailbox(aiResponseText);
                 }
 
-                // 保存はここで1回だけ。古い発言が押し出されたときだけ全件を描き直す
                 var lenBefore = chatLogArray.length;
                 enforceMemoryLimit();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(chatLogArray));
