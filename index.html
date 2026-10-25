@@ -800,14 +800,28 @@
             } catch(e) { console.error("メモ読込エラー", e); }
 
             try {
-                var chatSnap = await db.collection("records").where("app_type", "==", "chat").get();
-                chatLogArray = [];
-                chatSnap.forEach(doc => {
-                    var d = doc.data();
-                    if (d.status === "published") { chatLogArray.push(d); }
-                });
-                chatLogArray.sort((a, b) => a.created_at - b.created_at);
-            } catch(e) { console.error("チャット読込エラー", e); }
+    // ① 面倒な設定不要。単純に「ID（時間）が新しい順に最新100件」だけダウンロードする
+    var chatSnap = await db.collection("records")
+        .orderBy("id", "desc") 
+        .limit(100) 
+        .get();
+
+    chatLogArray = [];
+    chatSnap.forEach(doc => {
+        var d = doc.data();
+        // ② 拾ってきた最新100件の中から、チャット（かつ有効なもの）だけをメモリに残す
+        if (d.app_type === "chat" && d.status === "published") { 
+            chatLogArray.push(d); 
+        }
+    });
+
+    // ③ メモリに残ったログを、正常な時系列（古い順）に戻す
+    chatLogArray.sort((a, b) => a.id - b.id);
+
+} catch(e) { 
+    console.error("チャット読込エラー", e); 
+}
+}
 
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
