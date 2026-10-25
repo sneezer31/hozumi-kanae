@@ -800,25 +800,14 @@
             } catch(e) { console.error("メモ読込エラー", e); }
 
             try {
-    // ① クラウド側で「最新の100件だけ」を切り取らせてからダウンロードする
-    var chatSnap = await db.collection("records")
-        .where("app_type", "==", "chat")
-        .orderBy("created_at", "desc") // 新しい順に並べ替え
-        .limit(100) // 最新の100件（約50往復分）に制限。※文字数ではなく件数で切るのがDBの鉄則
-        .get();
-
-    chatLogArray = [];
-    chatSnap.forEach(doc => {
-        var d = doc.data();
-        chatLogArray.push(d); // status="published"の無駄な判別も撤廃
-    });
-
-    // ② 取得した最新100件を、古い順（会話の正常な時系列）に戻す
-    chatLogArray.sort((a, b) => a.created_at - b.created_at);
-
-} catch(e) { 
-    console.error("チャット読込エラー", e); 
-}
+                var chatSnap = await db.collection("records").where("app_type", "==", "chat").get();
+                chatLogArray = [];
+                chatSnap.forEach(doc => {
+                    var d = doc.data();
+                    if (d.status === "published") { chatLogArray.push(d); }
+                });
+                chatLogArray.sort((a, b) => a.created_at - b.created_at);
+            } catch(e) { console.error("チャット読込エラー", e); }
 
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
