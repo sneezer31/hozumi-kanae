@@ -826,7 +826,7 @@
             renderLogs(); renderTimers();
             if (localStorage.getItem(API_KEY_VAULT)) document.getElementById("api-key-input").value = "********"; 
             
-            setInterval(updateCacheUI, 1000); updateCacheUI():}
+            setInterval(updateCacheUI, 1000); updateCacheUI();}
 
         document.getElementById("copy-checked-btn").onclick = function() {
             var checked = Array.from(document.querySelectorAll(".log-checkbox:checked")); if(!checked.length) return;
