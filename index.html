@@ -20,7 +20,7 @@
         body { display: flex; flex-direction: column; background-color: #f4f4f5; color: #595959; height: 100dvh; }
         
         header, #control-area, #sidebar-console, #right-sidebar { -webkit-user-select: none; user-select: none; }
-        header { height: 50px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
+        header { height: 40px; flex: none; background-color: #2c3e50; color: #ffffff; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 14px; font-weight: bold; position: relative; z-index: 30; }
 
         #log-window { padding: 15px 10px !important; }
         #log-window { flex: 1; background-color: #ffffff; padding: 15px 10px; overflow-y: auto; border-bottom: 2px solid #bdc3c7; -webkit-user-select: text; user-select: text; }
@@ -87,8 +87,9 @@
         padding: 16px 16px !important;
     }
     #input-window {
-        padding: 8px 16px;
-    }
+    min-height: 50px; /* 元の 70px から変更（または auto にする） */
+    padding: 6px 10px; /* 元の 10px から、上下を6pxに縮小 */
+}
     #control-area {
         padding: 0 15px 15px 16px;
     }
@@ -96,7 +97,7 @@
     /* 文字サイズの拡大（X相当） */
     .log-user, .log-ai, textarea#main-input {
         font-size: 20px !important;
-        line-height: 1.7 !important;
+        line-height: 1.5 !important;
     }
         }
     </style>
